@@ -6,18 +6,7 @@
 
 #include <olm/olm.h>
 
-
-
-
-
-typedef struct FixedBuffer {
-    void * ptr;
-    int size;
-    int len;
-} FixedBuffer;
-
-FixedBuffer
-FixedBuf(const char * str);
+#include "fixedbuffer.h"
 
 
 
