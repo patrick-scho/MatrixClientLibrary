@@ -6,34 +6,48 @@
 
 #include <olm/olm.h>
 
-#include "fixedbuffer.h"
 
 
+// TODO: fix
+#define SERVER_SIZE 20
+#define ACCESS_TOKEN_SIZE 40
+#define DEVICE_ID_SIZE 20
+#define EXPIRE_MS_SIZE 20
+#define REFRESH_TOKEN_SIZE 20
+#define MAX_URL_LEN 128
 
-#define ACCESS_TOKEN_LEN 20 // TODO: fix
 
 typedef struct MatrixClient {
-    OlmAccount * olmAcc;
-    char accessToken[ACCESS_TOKEN_LEN];
+    void * httpUserData;
+    OlmAccount * olmAccount;
+    OlmSession * olmSession;
+    char server[SERVER_SIZE]; int serverLen;
+    char accessTokenBuffer[ACCESS_TOKEN_SIZE]; int accessTokenLen;
+    char deviceIdBuffer[DEVICE_ID_SIZE]; int deviceIdLen;
+    char expireMsBuffer[EXPIRE_MS_SIZE]; int expireMsLen;
+    char refreshTokenBuffer[REFRESH_TOKEN_SIZE]; int refreshTokenLen;
 } MatrixClient;
 
 bool
 MatrixClientInit(
     MatrixClient * client,
-    FixedBuffer server
+    char * server, int serverLen
 );
 
 bool
 MatrixClientLoginPassword(
     MatrixClient * client,
-    FixedBuffer username,
-    FixedBuffer password
+    char * username, int usernameLen,
+    char * password, int passwordLen,
+    char * displayName, int displayNameLen
 );
 
 bool
-MatrixClientGetAccessToken(
+MatrixHttpPost(
     MatrixClient * client,
-    FixedBuffer * outBuffer
+    const char * url,
+    char * requestBuffer, int requestLen,
+    char * outResponseBuffer, int outResponseCap, int * outResponseLen
 );
 
 #endif
