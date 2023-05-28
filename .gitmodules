@@ -4,3 +4,9 @@
 [submodule "ext/mjson"]
 	path = ext/mjson
 	url = https://github.com/cesanta/mjson
+[submodule "ext/curl"]
+	path = ext/curl
+	url = https://github.com/curl/curl
+[submodule "ext/mongoose"]
+	path = ext/mongoose
+	url = https://github.com/cesanta/mongoose
