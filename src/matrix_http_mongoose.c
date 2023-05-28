@@ -6,6 +6,7 @@
 #include <mongoose.h>
 
 //#define HTTP_DATA_SIZE 1024
+#define AUTHORIZATION_HEADER_LEN 64
 
 typedef struct MatrixHttpConnection {
     struct mg_mgr mgr;
@@ -48,6 +49,7 @@ MatrixHttpCallback(
         // memcpy_s(client->data, 1024, hm->message.ptr, hm->message.len);
         // client->dataLen = hm->message.len;
         memcpy_s(conn->data, conn->dataCap, hm->body.ptr, hm->body.len);
+        conn->data[hm->body.len] = '\0';
         conn->dataLen = hm->body.len;
         conn->dataReceived = true;
     }
@@ -89,7 +91,8 @@ bool
 MatrixHttpGet(
     MatrixClient * client,
     const char * url,
-    char * outResponseBuffer, int outResponseCap)
+    char * outResponseBuffer, int outResponseCap,
+    bool authenticated)
 {
     MatrixHttpConnection * conn = (MatrixHttpConnection *)client->httpUserData;
 
@@ -97,12 +100,19 @@ MatrixHttpGet(
 
     struct mg_str host = mg_url_host(client->server);
 
+    static char authorizationHeader[AUTHORIZATION_HEADER_LEN] = "\0";
+    if (authenticated)
+        sprintf_s(authorizationHeader, AUTHORIZATION_HEADER_LEN,
+            "Authorization: Bearer %s\r\n", client->accessTokenBuffer);
+
     mg_printf(conn->connection,
         "GET %s HTTP/1.1\r\n"
         "Host: %.*s\r\n"
+        "%s"
         "\r\n",
         url,
-        host.len, host.ptr);
+        host.len, host.ptr,
+        authorizationHeader);
 
     conn->data = outResponseBuffer;
     conn->dataCap = outResponseCap;
@@ -118,7 +128,8 @@ MatrixHttpPost(
     MatrixClient * client,
     const char * url,
     const char * requestBuffer,
-    char * outResponseBuffer, int outResponseCap)
+    char * outResponseBuffer, int outResponseCap,
+    bool authenticated)
 {
     MatrixHttpConnection * conn = (MatrixHttpConnection *)client->httpUserData;
 
@@ -126,9 +137,15 @@ MatrixHttpPost(
 
     struct mg_str host = mg_url_host(client->server);
 
+    static char authorizationHeader[AUTHORIZATION_HEADER_LEN] = "\0";
+    if (authenticated)
+        sprintf_s(authorizationHeader, AUTHORIZATION_HEADER_LEN,
+            "Authorization: Bearer %s\r\n", client->accessTokenBuffer);
+
     mg_printf(conn->connection,
             "POST %s HTTP/1.0\r\n"
             "Host: %.*s\r\n"
+            "%s"
             "Content-Type: application/json\r\n"
             "Content-Length: %d\r\n"
             "\r\n"
@@ -136,6 +153,52 @@ MatrixHttpPost(
             "\r\n",
             url,
             host.len, host.ptr,
+            authorizationHeader,
+            strlen(requestBuffer),
+            requestBuffer);
+
+    conn->data = outResponseBuffer;
+    conn->dataCap = outResponseCap;
+    
+    while (! conn->dataReceived)
+        mg_mgr_poll(&conn->mgr, 1000);
+
+    return conn->dataReceived;
+}
+
+bool
+MatrixHttpPut(
+    MatrixClient * client,
+    const char * url,
+    const char * requestBuffer,
+    char * outResponseBuffer, int outResponseCap,
+    bool authenticated)
+{
+    MatrixHttpConnection * conn = (MatrixHttpConnection *)client->httpUserData;
+
+    conn->dataReceived = false;
+
+    struct mg_str host = mg_url_host(client->server);
+
+    static char authorizationHeader[AUTHORIZATION_HEADER_LEN];
+    if (authenticated)
+        sprintf_s(authorizationHeader, AUTHORIZATION_HEADER_LEN,
+            "Authorization: Bearer %s\r\n", client->accessTokenBuffer);
+    else
+        authorizationHeader[0] = '\0';
+
+    mg_printf(conn->connection,
+            "PUT %s HTTP/1.0\r\n"
+            "Host: %.*s\r\n"
+            "%s"
+            "Content-Type: application/json\r\n"
+            "Content-Length: %d\r\n"
+            "\r\n"
+            "%s"
+            "\r\n",
+            url,
+            host.len, host.ptr,
+            authorizationHeader,
             strlen(requestBuffer),
             requestBuffer);
 

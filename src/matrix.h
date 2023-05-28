@@ -21,7 +21,7 @@ typedef struct MatrixClient {
     OlmAccount * olmAccount;
     OlmSession * olmSession;
     
-    char server[SERVER_SIZE];
+    char server[SERVER_SIZE+1];
     char accessTokenBuffer[ACCESS_TOKEN_SIZE];
     char deviceIdBuffer[DEVICE_ID_SIZE];
     char expireMsBuffer[EXPIRE_MS_SIZE];
@@ -36,11 +36,23 @@ MatrixClientInit(
     const char * server);
 
 bool
+MatrixClientSetAccessToken(
+    MatrixClient * client,
+    const char * accessToken);
+
+bool
 MatrixClientLoginPassword(
     MatrixClient * client,
     const char * username,
     const char * password,
     const char * displayName);
+    
+bool
+MatrixClientSendEvent(
+    MatrixClient * client,
+    const char * roomId,
+    const char * msgType,
+    const char * msgBody);
 
 bool
 MatrixHttpInit(
@@ -54,13 +66,23 @@ bool
 MatrixHttpGet(
     MatrixClient * client,
     const char * url,
-    char * outResponseBuffer, int outResponseCap);
+    char * outResponseBuffer, int outResponseCap,
+    bool authenticated);
 
 bool
 MatrixHttpPost(
     MatrixClient * client,
     const char * url,
     const char * requestBuffer,
-    char * outResponseBuffer, int outResponseCap);
+    char * outResponseBuffer, int outResponseCap,
+    bool authenticated);
+
+bool
+MatrixHttpPut(
+    MatrixClient * client,
+    const char * url,
+    const char * requestBuffer,
+    char * outResponseBuffer, int outResponseCap,
+    bool authenticated);
 
 #endif

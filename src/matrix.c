@@ -1,5 +1,6 @@
 #include "matrix.h"
 
+#include <time.h>
 #include <stdio.h>
 #include <mjson.h>
 
@@ -7,6 +8,10 @@
 #define LOGIN_REQUEST_SIZE 1024
 #define LOGIN_RESPONSE_SIZE 1024
 #define LOGIN_URL "/_matrix/client/v3/login"
+
+#define ROOMEVENT_REQUEST_SIZE 1024
+#define ROOMEVENT_RESPONSE_SIZE 1024
+#define ROOMEVENT_URL "/_matrix/client/v3/rooms/%s/send/%s/%d"
 
 
 bool
@@ -19,6 +24,22 @@ MatrixClientInit(
         SERVER_SIZE,
         server
     );
+
+    return true;
+}
+
+bool
+MatrixClientSetAccessToken(
+    MatrixClient * client,
+    const char * accessToken)
+{
+    int accessTokenLen = strlen(accessToken);
+
+    if (accessTokenLen < ACCESS_TOKEN_SIZE - 1)
+        return false;
+
+    for (int i = 0; i < accessTokenLen; i++)
+        client->accessTokenBuffer[i] = accessToken[i];
 
     return true;
 }
@@ -52,7 +73,8 @@ MatrixClientLoginPassword(
         MatrixHttpPost(client,
             LOGIN_URL,
             requestBuffer,
-            responseBuffer, LOGIN_RESPONSE_SIZE);
+            responseBuffer, LOGIN_RESPONSE_SIZE,
+            false);
     
     int responseLen = strlen(responseBuffer);
     
@@ -73,5 +95,27 @@ MatrixClientLoginPassword(
         client->refreshTokenBuffer, REFRESH_TOKEN_SIZE);
 
     return true;
+}
+    
+bool
+MatrixClientSendEvent(
+    MatrixClient * client,
+    const char * roomId,
+    const char * msgType,
+    const char * msgBody)
+{    
+    static char requestUrl[MAX_URL_LEN];
+    sprintf_s(requestUrl, MAX_URL_LEN,
+        ROOMEVENT_URL, roomId, msgType, time(NULL));
+
+    static char responseBuffer[ROOMEVENT_RESPONSE_SIZE];
+    bool result =
+        MatrixHttpPut(client,
+            requestUrl,
+            msgBody,
+            responseBuffer, ROOMEVENT_RESPONSE_SIZE,
+            true);
+    
+    return result;
 }
 
