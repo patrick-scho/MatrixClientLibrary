@@ -1,5 +1,6 @@
 #include "matrix.h"
 
+#include <stdio.h>
 #include <mjson.h>
 
 
@@ -11,8 +12,8 @@
 bool
 MatrixClientInit(
     MatrixClient * client,
-    char * server, int serverLen
-) {
+    char * server, int serverLen)
+{
     strcpy_s(
         client->server,
         SERVER_SIZE,
@@ -29,8 +30,8 @@ MatrixClientLoginPassword(
     MatrixClient * client,
     char * username, int usernameLen,
     char * password, int passwordLen,
-    char * displayName, int displayNameLen
-) {
+    char * displayName, int displayNameLen)
+{
     static char requestBuffer[LOGIN_REQUEST_SIZE];
 
     int requestLen =

@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <matrix.h>
-#include <curl/curl.h>
+#include <mongoose.h>
 
 #define SERVER      "https://matrix.org"
 #define USERNAME    "pscho"
@@ -14,8 +14,7 @@ main()
     MatrixClient client;
     MatrixClientInit(&client, SERVER, strlen(SERVER));
     
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-    client.httpUserData = (void *)curl_easy_init();
+    MatrixHttpInit(&client);
 
     MatrixClientLoginPassword(&client,
         USERNAME, strlen(USERNAME),
@@ -27,8 +26,7 @@ main()
     printf("Expires in (ms): %.*s\n", client.expireMsLen, client.expireMsBuffer);
     printf("Refresh Token: %.*s\n", client.refreshTokenLen, client.refreshTokenBuffer);
     
-    curl_easy_cleanup((CURL *)client.httpUserData);
-    curl_global_cleanup();
+    MatrixHttpDeinit(&client);
 
     return 0;
 }
