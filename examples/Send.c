@@ -1,25 +1,26 @@
 #include <matrix.h>
 
-#define SERVER FixedBuf("matrix.org")
-#define ACCESS_TOKEN FixedBuf("abc")
-#define ROOM_ID FixedBuf("!jhpZBTbckszblMYjMK:matrix.org")
+#define SERVER       "matrix.org"
+#define ACCESS_TOKEN "syt_cHNjaG8_yBvTjVTquGCikvsAenOJ_49mBMO"
+#define DEVICE_ID    "MAZNCCZLBR"
+#define ROOM_ID      "!jhpZBTbckszblMYjMK:matrix.org"
 
 int
-main(
-    int argc,
-    char **argv)
+main()
 {
     MatrixClient client;
     MatrixClientCreate(&client,
-        SERVER);
+        SERVER, strlen(SERVER));
+    
+    MatrixHttpInit(&client);
 
     MatrixClientSetAccessToken(&client,
-        ACCESS_TOKEN);
+        ACCESS_TOKEN, strlen(ACCESS_TOKEN));
 
     MatrixClientSendEvent(&client,
         ROOM_ID,
-        FixedBuf("m.room.message"),
-        FixedBuf("{\"body\":\"Hello\",\"msgtype\":\"m.text\"}"));
+        "m.room.message",
+        "{\"body\":\"Hello\",\"msgtype\":\"m.text\"}");
 
     return 0;
 }

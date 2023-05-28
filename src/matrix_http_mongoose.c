@@ -89,7 +89,7 @@ bool
 MatrixHttpGet(
     MatrixClient * client,
     const char * url,
-    char * outResponseBuffer, int outResponseCap, int * outResponseLen)
+    char * outResponseBuffer, int outResponseCap)
 {
     MatrixHttpConnection * conn = (MatrixHttpConnection *)client->httpUserData;
 
@@ -110,8 +110,6 @@ MatrixHttpGet(
     while (! conn->dataReceived)
         mg_mgr_poll(&conn->mgr, 1000);
 
-    *outResponseLen = conn->dataLen;
-
     return conn->dataReceived;
 }
 
@@ -119,8 +117,8 @@ bool
 MatrixHttpPost(
     MatrixClient * client,
     const char * url,
-    char * requestBuffer, int requestLen,
-    char * outResponseBuffer, int outResponseCap, int * outResponseLen)
+    const char * requestBuffer,
+    char * outResponseBuffer, int outResponseCap)
 {
     MatrixHttpConnection * conn = (MatrixHttpConnection *)client->httpUserData;
 
@@ -138,7 +136,7 @@ MatrixHttpPost(
             "\r\n",
             url,
             host.len, host.ptr,
-            requestLen,
+            strlen(requestBuffer),
             requestBuffer);
 
     conn->data = outResponseBuffer;
@@ -146,8 +144,6 @@ MatrixHttpPost(
     
     while (! conn->dataReceived)
         mg_mgr_poll(&conn->mgr, 1000);
-
-    *outResponseLen = conn->dataLen;
 
     return conn->dataReceived;
 }

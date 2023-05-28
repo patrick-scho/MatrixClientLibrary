@@ -21,11 +21,11 @@ typedef struct MatrixClient {
     OlmAccount * olmAccount;
     OlmSession * olmSession;
     
-    char server[SERVER_SIZE]; int serverLen;
-    char accessTokenBuffer[ACCESS_TOKEN_SIZE]; int accessTokenLen;
-    char deviceIdBuffer[DEVICE_ID_SIZE]; int deviceIdLen;
-    char expireMsBuffer[EXPIRE_MS_SIZE]; int expireMsLen;
-    char refreshTokenBuffer[REFRESH_TOKEN_SIZE]; int refreshTokenLen;
+    char server[SERVER_SIZE];
+    char accessTokenBuffer[ACCESS_TOKEN_SIZE];
+    char deviceIdBuffer[DEVICE_ID_SIZE];
+    char expireMsBuffer[EXPIRE_MS_SIZE];
+    char refreshTokenBuffer[REFRESH_TOKEN_SIZE];
 
     void * httpUserData;
 } MatrixClient;
@@ -33,14 +33,14 @@ typedef struct MatrixClient {
 bool
 MatrixClientInit(
     MatrixClient * client,
-    char * server, int serverLen);
+    const char * server);
 
 bool
 MatrixClientLoginPassword(
     MatrixClient * client,
-    char * username, int usernameLen,
-    char * password, int passwordLen,
-    char * displayName, int displayNameLen);
+    const char * username,
+    const char * password,
+    const char * displayName);
 
 bool
 MatrixHttpInit(
@@ -54,13 +54,13 @@ bool
 MatrixHttpGet(
     MatrixClient * client,
     const char * url,
-    char * outResponseBuffer, int outResponseCap, int * outResponseLen);
+    char * outResponseBuffer, int outResponseCap);
 
 bool
 MatrixHttpPost(
     MatrixClient * client,
     const char * url,
-    char * requestBuffer, int requestLen,
-    char * outResponseBuffer, int outResponseCap, int * outResponseLen);
+    const char * requestBuffer,
+    char * outResponseBuffer, int outResponseCap);
 
 #endif

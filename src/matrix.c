@@ -12,14 +12,13 @@
 bool
 MatrixClientInit(
     MatrixClient * client,
-    char * server, int serverLen)
+    const char * server)
 {
     strcpy_s(
         client->server,
         SERVER_SIZE,
         server
     );
-    client->serverLen = serverLen;
 
     return true;
 }
@@ -28,54 +27,50 @@ MatrixClientInit(
 bool
 MatrixClientLoginPassword(
     MatrixClient * client,
-    char * username, int usernameLen,
-    char * password, int passwordLen,
-    char * displayName, int displayNameLen)
+    const char * username,
+    const char * password,
+    const char * displayName)
 {
     static char requestBuffer[LOGIN_REQUEST_SIZE];
 
-    int requestLen =
-        mjson_snprintf(requestBuffer, LOGIN_REQUEST_SIZE,
-            "{"
-                "\"type\": \"m.login.password\","
-                "\"identifier\": {"
-                    "\"type\": \"m.id.user\","
-                    "\"user\": \"%.*s\""
-                "},"
-                "\"password\": \"%.*s\","
-                "\"initial_device_display_name\": \"%.*s\""
-            "}",
-            usernameLen, username,
-            passwordLen, password,
-            displayNameLen, displayName);
+    mjson_snprintf(requestBuffer, LOGIN_REQUEST_SIZE,
+        "{"
+            "\"type\": \"m.login.password\","
+            "\"identifier\": {"
+                "\"type\": \"m.id.user\","
+                "\"user\": \"%s\""
+            "},"
+            "\"password\": \"%s\","
+            "\"initial_device_display_name\": \"%s\""
+        "}",
+        username,
+        password,
+        displayName);
     
     static char responseBuffer[LOGIN_RESPONSE_SIZE];
-    int responseLen;
     bool result =
         MatrixHttpPost(client,
             LOGIN_URL,
-            requestBuffer, requestLen,
-            responseBuffer, LOGIN_RESPONSE_SIZE, &responseLen);
+            requestBuffer,
+            responseBuffer, LOGIN_RESPONSE_SIZE);
+    
+    int responseLen = strlen(responseBuffer);
     
     if (!result)
         return false;
 
-    client->accessTokenLen =
-        mjson_get_string(responseBuffer, responseLen,
-            "$.access_token",
-            client->accessTokenBuffer, ACCESS_TOKEN_SIZE);
-    client->deviceIdLen =
-        mjson_get_string(responseBuffer, responseLen,
-            "$.device_id",
-            client->deviceIdBuffer, DEVICE_ID_SIZE);
-    client->expireMsLen =
-        mjson_get_string(responseBuffer, responseLen,
-            "$.expires_in_ms",
-            client->expireMsBuffer, EXPIRE_MS_SIZE);
-    client->refreshTokenLen =
-        mjson_get_string(responseBuffer, responseLen,
-            "$.refresh_token",
-            client->refreshTokenBuffer, REFRESH_TOKEN_SIZE);
+    mjson_get_string(responseBuffer, responseLen,
+        "$.access_token",
+        client->accessTokenBuffer, ACCESS_TOKEN_SIZE);
+    mjson_get_string(responseBuffer, responseLen,
+        "$.device_id",
+        client->deviceIdBuffer, DEVICE_ID_SIZE);
+    mjson_get_string(responseBuffer, responseLen,
+        "$.expires_in_ms",
+        client->expireMsBuffer, EXPIRE_MS_SIZE);
+    mjson_get_string(responseBuffer, responseLen,
+        "$.refresh_token",
+        client->refreshTokenBuffer, REFRESH_TOKEN_SIZE);
 
     return true;
 }

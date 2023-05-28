@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <matrix.h>
-#include <mongoose.h>
 
 #define SERVER      "https://matrix.org"
 #define USERNAME    "pscho"
@@ -12,19 +11,20 @@ int
 main()
 {
     MatrixClient client;
-    MatrixClientInit(&client, SERVER, strlen(SERVER));
+    MatrixClientInit(&client,
+        SERVER);
     
     MatrixHttpInit(&client);
 
     MatrixClientLoginPassword(&client,
-        USERNAME, strlen(USERNAME),
-        PASSWORD, strlen(PASSWORD),
-        DISPLAYNAME, strlen(DISPLAYNAME));
+        USERNAME,
+        PASSWORD,
+        DISPLAYNAME);
 
-    printf("Access Token: %.*s\n", client.accessTokenLen, client.accessTokenBuffer);
-    printf("Device ID: %.*s\n", client.deviceIdLen, client.deviceIdBuffer);
-    printf("Expires in (ms): %.*s\n", client.expireMsLen, client.expireMsBuffer);
-    printf("Refresh Token: %.*s\n", client.refreshTokenLen, client.refreshTokenBuffer);
+    printf("Access Token: %s\n", client.accessTokenBuffer);
+    printf("Device ID: %s\n", client.deviceIdBuffer);
+    printf("Expires in (ms): %s\n", client.expireMsBuffer);
+    printf("Refresh Token: %s\n", client.refreshTokenBuffer);
     
     MatrixHttpDeinit(&client);
 
