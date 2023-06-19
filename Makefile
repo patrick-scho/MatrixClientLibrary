@@ -9,11 +9,12 @@ C_OPTS+=-I src/
 C_OPTS+=-I ext/olm/include/
 C_OPTS+=-I ext/mjson/src/
 C_OPTS+=-I ext/mongoose/
+C_OPTS+=-L out/olm/
 C_OPTS+=-l ws2_32
 C_OPTS+=-l ssl
 C_OPTS+=-l crypto
+C_OPTS+=-l olm
 C_OPTS+=-D MG_ENABLE_OPENSSL=1
-C_OPTS+=-g
 # C_OPTS+=-I ext/curl/include/
 # C_OPTS+=-L ext/curl/build/lib/
 # C_OPTS+=-l curl
@@ -22,7 +23,6 @@ C_OPTS+=-g
 
 out/examples/%: examples/%.c src/*
 	$(CC) -o out/examples/$* examples/$*.c $(C_OPTS)
-
 
 .PHONY: examples
 

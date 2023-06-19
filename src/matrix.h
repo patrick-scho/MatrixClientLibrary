@@ -2,13 +2,15 @@
 #define MATRIX__H
 
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <olm/olm.h>
 
 
 
-// TODO: fix
+#define USER_ID_SIZE 64
 #define SERVER_SIZE 20
 #define ACCESS_TOKEN_SIZE 40
 #define DEVICE_ID_SIZE 20
@@ -16,16 +18,105 @@
 #define REFRESH_TOKEN_SIZE 20
 #define MAX_URL_LEN 128
 
+#define DEVICE_KEY_SIZE 20
+
+#define KEY_SHARE_EVENT_LEN 1024
+
+#define OLM_SESSION_MEMORY_SIZE 3352
+#define OLM_ENCRYPT_RANDOM_SIZE 32
+
+#define MEGOLM_OUTBOUND_SESSION_MEMORY_SIZE 232
+#define MEGOLM_SESSION_ID_SIZE 44
+#define MEGOLM_SESSION_KEY_SIZE 306
+#define MEGOLM_INIT_RANDOM_SIZE (4*32 + 32)
+
+#define NUM_MEGOLM_SESSIONS 10
+#define NUM_OLM_SESSIONS 10
+#define NUM_DEVICES 10
+
+void
+Randomize(uint8_t * random, int randomLen);
+
+bool
+JsonEscape(
+    char * sIn, int sInLen,
+    char * sOut, int sOutCap);
+
+typedef struct MatrixDevice {
+    char deviceId[DEVICE_ID_SIZE];
+    char deviceKey[DEVICE_KEY_SIZE];
+} MatrixDevice;
+
+typedef struct MatrixOlmSession {
+    const char * deviceId;
+
+    int type;
+    OlmSession * session;
+    char memory[OLM_SESSION_MEMORY_SIZE];
+} MatrixOlmSession;
+
+bool
+MatrixOlmSessionInit(
+    MatrixOlmSession * session,
+    const char * deviceId);
+
+bool
+MatrixOlmSessionEncrypt(
+    MatrixOlmSession * session,
+    const char * plaintext,
+    char * outBuffer, int outBufferCap);
+
+
+
+typedef struct MatrixMegolmInSession {
+    OlmInboundGroupSession * session;
+} MatrixMegolmInSession;
+
+typedef struct MatrixMegolmOutSession {
+    const char * roomId;
+
+    OlmOutboundGroupSession * session;
+    char memory[MEGOLM_OUTBOUND_SESSION_MEMORY_SIZE];
+
+    char id[MEGOLM_SESSION_ID_SIZE];
+    char key[MEGOLM_SESSION_KEY_SIZE];
+} MatrixMegolmOutSession;
+
+bool
+MatrixMegolmOutSessionInit(
+    MatrixMegolmOutSession * session,
+    const char * roomId);
+    
+bool
+MatrixMegolmOutSessionEncrypt(
+    MatrixMegolmOutSession * session,
+    const char * plaintext,
+    char * outBuffer, int outBufferCap);
+
+
 
 typedef struct MatrixClient {
     OlmAccount * olmAccount;
     OlmSession * olmSession;
+
+    MatrixMegolmInSession megolmInSessions[NUM_MEGOLM_SESSIONS];
+    int numMegolmInSessions;
+    MatrixMegolmOutSession megolmOutSessions[NUM_MEGOLM_SESSIONS];
+    int numMegolmOutSessions;
+    MatrixOlmSession olmSessions[NUM_OLM_SESSIONS];
+    int numOlmSessions;
     
-    char server[SERVER_SIZE+1];
-    char accessTokenBuffer[ACCESS_TOKEN_SIZE];
-    char deviceIdBuffer[DEVICE_ID_SIZE];
-    char expireMsBuffer[EXPIRE_MS_SIZE];
-    char refreshTokenBuffer[REFRESH_TOKEN_SIZE];
+    MatrixDevice devices[NUM_DEVICES];
+    int numDevices;
+    
+    char deviceKey[DEVICE_KEY_SIZE];
+
+    char userId[USER_ID_SIZE];
+    char server[SERVER_SIZE];
+    char accessToken[ACCESS_TOKEN_SIZE];
+    char deviceId[DEVICE_ID_SIZE];
+    char expireMs[EXPIRE_MS_SIZE];
+    char refreshToken[REFRESH_TOKEN_SIZE];
 
     void * httpUserData;
 } MatrixClient;
@@ -53,6 +144,76 @@ MatrixClientSendEvent(
     const char * roomId,
     const char * msgType,
     const char * msgBody);
+    
+bool
+MatrixClientSendEventEncrypted(
+    MatrixClient * client,
+    const char * roomId,
+    const char * msgType,
+    const char * msgBody);
+
+bool
+MatrixClientSync(
+    MatrixClient * client,
+    char * outSyncBuffer, int outSyncCap);
+
+bool
+MatrixClientShareMegolmOutSession(
+    MatrixClient * client,
+    const char * deviceId,
+    MatrixMegolmOutSession * session);
+
+bool
+MatrixClientGetMegolmOutSession(
+    MatrixClient * client,
+    const char * roomId,
+    MatrixMegolmOutSession ** outSession);
+
+bool
+MatrixClientSetMegolmOutSession(
+    MatrixClient * client,
+    const char * roomId,
+    MatrixMegolmOutSession session);
+
+bool
+MatrixClientGetOlmSession(
+    MatrixClient * client,
+    const char * deviceId,
+    MatrixOlmSession ** outSession);
+
+bool
+MatrixClientSendToDevice(
+    MatrixClient * client,
+    const char * userId,
+    const char * deviceId,
+    const char * message,
+    const char * msgType);
+
+bool
+MatrixClientSendToDeviceEncrypted(
+    MatrixClient * client,
+    const char * userId,
+    const char * deviceId,
+    const char * message,
+    const char * msgType);
+
+bool
+MatrixClientGetDeviceKey(
+    MatrixClient * client,
+    const char * deviceId,
+    char * outDeviceKey, int outDeviceKeyCap);
+
+bool
+MatrixClientGetDeviceKey(
+    MatrixClient * client,
+    const char * deviceId,
+    char * outDeviceKey, int outDeviceKeyCap);
+
+bool
+MatrixClientRequestDeviceKeys(
+    MatrixClient * client);
+
+
 
 bool
 MatrixHttpInit(

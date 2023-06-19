@@ -1,31 +1,28 @@
 #include <matrix.h>
+#include <stdio.h>
 
-#define SERVER "matrix.org"
-#define ACCESS_TOKEN "abc"
-#define ROOM_ID "!jhpZBTbckszblMYjMK:matrix.org"
+#define SERVER       "https://matrix.org"
+#define ACCESS_TOKEN "syt_cHNjaG8_yBvTjVTquGCikvsAenOJ_49mBMO"
+#define DEVICE_ID    "MAZNCCZLBR"
 
 int
-main(
-    int argc,
-    char **argv)
+main(void)
 {
     MatrixClient client;
-    MatrixClientCreate(&client,
+    MatrixClientInit(&client,
         SERVER);
+    
+    MatrixHttpInit(&client);
 
     MatrixClientSetAccessToken(&client,
         ACCESS_TOKEN);
 
-    static char syncCharBuffer[1024];
-    FixedBuffer syncBuffer = { syncCharBuffer, 1024, 0 };
-    int syncN = 1;
-
-    while (syncN > 0)
-    {
-        MatrixClientSyncN(&client, &syncBuffer, &syncN);
-        printf("%.*s", syncBuffer.len, (char *)syncBuffer.ptr);
-    }
-    printf("\n");
+    static char syncBuffer[20000];
+    MatrixClientSync(&client,
+        syncBuffer, 20000);
+    printf("%s", syncBuffer);
+        
+    MatrixHttpDeinit(&client);
 
     return 0;
 }

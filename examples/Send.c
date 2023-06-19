@@ -6,7 +6,7 @@
 #define ROOM_ID      "!koVStwyiiKcBVbXZYz:matrix.org"
 
 int
-main()
+main(void)
 {
     MatrixClient client;
     MatrixClientInit(&client,

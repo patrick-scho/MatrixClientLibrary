@@ -1,4 +1,5 @@
 #include "matrix.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,7 +36,8 @@ MatrixHttpCallback(
         // If s_url is https://, tell client connection to use TLS
         if (mg_url_is_ssl(client->server))
         {
-            struct mg_tls_opts opts = {.srvname = host};
+            struct mg_tls_opts opts;
+            opts.srvname = host;
             mg_tls_init(c, &opts);
         }
 
@@ -48,10 +50,13 @@ MatrixHttpCallback(
         struct mg_http_message *hm = (struct mg_http_message *)ev_data;
         // memcpy_s(client->data, 1024, hm->message.ptr, hm->message.len);
         // client->dataLen = hm->message.len;
-        memcpy_s(conn->data, conn->dataCap, hm->body.ptr, hm->body.len);
+        memcpy(conn->data, hm->body.ptr, hm->body.len);
+        // memcpy_s(conn->data, conn->dataCap, hm->body.ptr, hm->body.len);
         conn->data[hm->body.len] = '\0';
         conn->dataLen = hm->body.len;
         conn->dataReceived = true;
+
+        printf("received[%d]:\n%.*s\n", conn->dataLen, conn->dataLen, conn->data);
     }
 }
 
@@ -100,10 +105,14 @@ MatrixHttpGet(
 
     struct mg_str host = mg_url_host(client->server);
 
-    static char authorizationHeader[AUTHORIZATION_HEADER_LEN] = "\0";
+    static char authorizationHeader[AUTHORIZATION_HEADER_LEN];
     if (authenticated)
-        sprintf_s(authorizationHeader, AUTHORIZATION_HEADER_LEN,
-            "Authorization: Bearer %s\r\n", client->accessTokenBuffer);
+        sprintf(authorizationHeader,
+            "Authorization: Bearer %s\r\n", client->accessToken);
+        // sprintf_s(authorizationHeader, AUTHORIZATION_HEADER_LEN,
+        //     "Authorization: Bearer %s\r\n", client->accessToken);
+    else
+        authorizationHeader[0] = '\0';
 
     mg_printf(conn->connection,
         "GET %s HTTP/1.1\r\n"
@@ -137,10 +146,12 @@ MatrixHttpPost(
 
     struct mg_str host = mg_url_host(client->server);
 
-    static char authorizationHeader[AUTHORIZATION_HEADER_LEN] = "\0";
+    static char authorizationHeader[AUTHORIZATION_HEADER_LEN];
     if (authenticated)
-        sprintf_s(authorizationHeader, AUTHORIZATION_HEADER_LEN,
-            "Authorization: Bearer %s\r\n", client->accessTokenBuffer);
+        sprintf(authorizationHeader,
+            "Authorization: Bearer %s\r\n", client->accessToken);
+    else
+        authorizationHeader[0] = '\0';
 
     mg_printf(conn->connection,
             "POST %s HTTP/1.0\r\n"
@@ -182,8 +193,8 @@ MatrixHttpPut(
 
     static char authorizationHeader[AUTHORIZATION_HEADER_LEN];
     if (authenticated)
-        sprintf_s(authorizationHeader, AUTHORIZATION_HEADER_LEN,
-            "Authorization: Bearer %s\r\n", client->accessTokenBuffer);
+        sprintf(authorizationHeader,
+            "Authorization: Bearer %s\r\n", client->accessToken);
     else
         authorizationHeader[0] = '\0';
 

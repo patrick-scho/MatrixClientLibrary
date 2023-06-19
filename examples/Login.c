@@ -8,7 +8,7 @@
 
 
 int
-main()
+main(void)
 {
     MatrixClient client;
     MatrixClientInit(&client,
@@ -21,10 +21,10 @@ main()
         PASSWORD,
         DISPLAYNAME);
 
-    printf("Access Token: %s\n", client.accessTokenBuffer);
-    printf("Device ID: %s\n", client.deviceIdBuffer);
-    printf("Expires in (ms): %s\n", client.expireMsBuffer);
-    printf("Refresh Token: %s\n", client.refreshTokenBuffer);
+    printf("Access Token: %s\n", client.accessToken);
+    printf("Device ID: %s\n", client.deviceId);
+    printf("Expires in (ms): %s\n", client.expireMs);
+    printf("Refresh Token: %s\n", client.refreshToken);
     
     MatrixHttpDeinit(&client);
 
