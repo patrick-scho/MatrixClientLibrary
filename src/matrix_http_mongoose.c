@@ -36,7 +36,7 @@ MatrixHttpCallback(
         // If s_url is https://, tell client connection to use TLS
         if (mg_url_is_ssl(client->server))
         {
-            struct mg_tls_opts opts;
+            static struct mg_tls_opts opts;
             opts.srvname = host;
             mg_tls_init(c, &opts);
         }
@@ -71,7 +71,8 @@ MatrixHttpInit(
     
     mg_mgr_init(&conn->mgr);
 
-    mg_http_connect(&conn->mgr, client->server, MatrixHttpCallback, client);
+    struct mg_connection * c =
+        mg_http_connect(&conn->mgr, client->server, MatrixHttpCallback, client);
 
     while (! conn->connected)
         mg_mgr_poll(&conn->mgr, 1000);
@@ -197,6 +198,20 @@ MatrixHttpPut(
             "Authorization: Bearer %s\r\n", client->accessToken);
     else
         authorizationHeader[0] = '\0';
+
+    printf("PUT %s HTTP/1.0\r\n"
+            "Host: %.*s\r\n"
+            "%s"
+            "Content-Type: application/json\r\n"
+            "Content-Length: %d\r\n"
+            "\r\n"
+            "%s"
+            "\r\n",
+            url,
+            host.len, host.ptr,
+            authorizationHeader,
+            strlen(requestBuffer),
+            requestBuffer);
 
     mg_printf(conn->connection,
             "PUT %s HTTP/1.0\r\n"

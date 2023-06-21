@@ -294,7 +294,7 @@ MatrixClientSendEventEncrypted(
         "\"algorithm\":\"m.megolm.v1.aes-sha2\","
         "\"sender_key\":\"%s\","
         "\"ciphertext\":\"%s\","
-        "\"session_id\":%s,"
+        "\"session_id\":\"%s\","
         "\"device_id\":\"%s\""
         "}",
         senderKey,
