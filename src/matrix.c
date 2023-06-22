@@ -157,6 +157,33 @@ MatrixClientInit(
 
     strcpy(client->server, server);
 
+    // init olm account
+    client->olmAccount = olm_account(client->olmAccountMemory);
+
+    static uint8_t random[OLM_ACCOUNT_RANDOM_SIZE];
+    Randomize(random, OLM_ACCOUNT_RANDOM_SIZE);
+
+    size_t res;
+    res = olm_create_account(
+        client->olmAccount,
+        random,
+        OLM_ACCOUNT_RANDOM_SIZE);
+
+    // set device key
+    static char deviceKeysJson[OLM_IDENTITY_KEYS_JSON_SIZE];
+    res =
+        olm_account_identity_keys(
+            client->olmAccount,
+            deviceKeysJson,
+            OLM_IDENTITY_KEYS_JSON_SIZE);
+
+    mjson_get_string(deviceKeysJson, res,
+        "$.curve25519",
+        client->deviceKey, DEVICE_KEY_SIZE);
+    mjson_get_string(deviceKeysJson, res,
+        "$.ed25519",
+        client->signingKey, SIGNING_KEY_SIZE);
+
     return true;
 }
 
@@ -167,11 +194,27 @@ MatrixClientSetAccessToken(
 {
     int accessTokenLen = strlen(accessToken);
 
-    if (accessTokenLen < ACCESS_TOKEN_SIZE - 1)
+    if (accessTokenLen > ACCESS_TOKEN_SIZE - 1)
         return false;
 
     for (int i = 0; i < accessTokenLen; i++)
         client->accessToken[i] = accessToken[i];
+
+    return true;
+}
+
+bool
+MatrixClientSetDeviceId(
+    MatrixClient * client,
+    const char * deviceId)
+{
+    int deviceIdLen = strlen(deviceId);
+
+    if (deviceIdLen > DEVICE_ID_SIZE - 1)
+        return false;
+
+    for (int i = 0; i < deviceIdLen; i++)
+        client->deviceId[i] = deviceId[i];
 
     return true;
 }

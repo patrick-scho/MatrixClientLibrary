@@ -18,9 +18,14 @@
 #define REFRESH_TOKEN_SIZE 20
 #define MAX_URL_LEN 128
 
-#define DEVICE_KEY_SIZE 20
+#define OLM_IDENTITY_KEYS_JSON_SIZE 128
+#define DEVICE_KEY_SIZE 44
+#define SIGNING_KEY_SIZE 44
 
 #define KEY_SHARE_EVENT_LEN 1024
+
+#define OLM_ACCOUNT_MEMORY_SIZE 7528
+#define OLM_ACCOUNT_RANDOM_SIZE 32+32
 
 #define OLM_SESSION_MEMORY_SIZE 3352
 #define OLM_ENCRYPT_RANDOM_SIZE 32
@@ -97,7 +102,7 @@ MatrixMegolmOutSessionEncrypt(
 
 typedef struct MatrixClient {
     OlmAccount * olmAccount;
-    OlmSession * olmSession;
+    char olmAccountMemory[OLM_ACCOUNT_MEMORY_SIZE];
 
     MatrixMegolmInSession megolmInSessions[NUM_MEGOLM_SESSIONS];
     int numMegolmInSessions;
@@ -110,6 +115,7 @@ typedef struct MatrixClient {
     int numDevices;
     
     char deviceKey[DEVICE_KEY_SIZE];
+    char signingKey[DEVICE_KEY_SIZE];
 
     char userId[USER_ID_SIZE];
     char server[SERVER_SIZE];
@@ -130,6 +136,11 @@ bool
 MatrixClientSetAccessToken(
     MatrixClient * client,
     const char * accessToken);
+
+bool
+MatrixClientSetDeviceId(
+    MatrixClient * client,
+    const char * deviceId);
 
 bool
 MatrixClientLoginPassword(

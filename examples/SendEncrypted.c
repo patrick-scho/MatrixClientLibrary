@@ -17,6 +17,8 @@ main(void)
 
     MatrixClientSetAccessToken(&client,
         ACCESS_TOKEN);
+    MatrixClientSetDeviceId(&client,
+        DEVICE_ID);
 
     // MatrixMegolmOutSession megolmOutSession;
     // MatrixMegolmOutSessionInit(&megolmOutSession);
