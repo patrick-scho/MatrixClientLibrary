@@ -27,3 +27,8 @@ out/examples/%: examples/%.c src/*
 .PHONY: examples
 
 examples: out/examples/Login out/examples/Send out/examples/SendEncrypted out/examples/Sync
+
+out/olm/libolm.a:
+	cd out/olm
+	cmake -DBUILD_SHARED_LIBS=OFF -DOLM_TESTS=OFF ../../ext/olm
+	cmake --build .
