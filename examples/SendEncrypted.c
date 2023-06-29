@@ -4,7 +4,8 @@
 #define SERVER       "https://matrix.org"
 #define ACCESS_TOKEN "syt_cHNjaG8_yBvTjVTquGCikvsAenOJ_49mBMO"
 #define DEVICE_ID    "MAZNCCZLBR"
-#define ROOM_ID      "!koVStwyiiKcBVbXZYz:matrix.org"
+#define USER_ID      "@pscho:matrix.org"
+#define ROOM_ID      "!XKFUjAsGrSSrpDFIxB:matrix.org"
 
 int
 main(void)
@@ -19,6 +20,8 @@ main(void)
         ACCESS_TOKEN);
     MatrixClientSetDeviceId(&client,
         DEVICE_ID);
+    MatrixClientSetUserId(&client,
+        USER_ID);
 
     // MatrixMegolmOutSession megolmOutSession;
     // MatrixMegolmOutSessionInit(&megolmOutSession);
@@ -31,6 +34,10 @@ main(void)
         ROOM_ID,
         "m.room.message",
         "{\"body\":\"Hello\",\"msgtype\":\"m.text\"}");
+
+    MatrixClientShareMegolmOutSessionTest(&client,
+        "ULZZOKJBYN",
+        &client.megolmOutSessions[0]);
         
     MatrixHttpDeinit(&client);
 

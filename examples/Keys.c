@@ -15,6 +15,10 @@ main(void)
         SERVER);
     
     MatrixHttpInit(&client);
+    
+    MatrixClientSetAccessToken(&client, ACCESS_TOKEN);
+    MatrixClientSetDeviceId(&client, DEVICE_ID);
+    MatrixClientSetUserId(&client, USER_ID);
 
     MatrixClientGenerateOnetimeKeys(&client,
         10);

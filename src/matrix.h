@@ -25,15 +25,24 @@
 #define KEY_SHARE_EVENT_LEN 1024
 
 #define OLM_ACCOUNT_MEMORY_SIZE 7528
-#define OLM_ACCOUNT_RANDOM_SIZE 32+32
+#define OLM_ACCOUNT_RANDOM_SIZE (32+32)
 
 #define OLM_SESSION_MEMORY_SIZE 3352
 #define OLM_ENCRYPT_RANDOM_SIZE 32
+
+#define OLM_ONETIME_KEYS_RANDOM_SIZE 32*10
+#define OLM_KEY_ID_SIZE 32
+
+#define OLM_SIGNATURE_SIZE 128
 
 #define MEGOLM_OUTBOUND_SESSION_MEMORY_SIZE 232
 #define MEGOLM_SESSION_ID_SIZE 44
 #define MEGOLM_SESSION_KEY_SIZE 306
 #define MEGOLM_INIT_RANDOM_SIZE (4*32 + 32)
+
+#define JSON_ONETIME_KEY_SIZE 128
+#define JSON_ONETIME_KEY_SIGNED_SIZE 256
+#define JSON_SIGNATURE_SIZE 256
 
 #define NUM_MEGOLM_SESSIONS 10
 #define NUM_OLM_SESSIONS 10
@@ -46,11 +55,32 @@ bool
 JsonEscape(
     char * sIn, int sInLen,
     char * sOut, int sOutCap);
+    
+bool JsonSign(
+    char * sIn, int sInLen,
+    char * sOut, int sOutCap);
+
+// Matrix Device
 
 typedef struct MatrixDevice {
     char deviceId[DEVICE_ID_SIZE];
     char deviceKey[DEVICE_KEY_SIZE];
 } MatrixDevice;
+
+
+// Matrix Olm Account
+
+typedef struct MatrixOlmAccount {
+    OlmAccount * account;
+    char memory[OLM_ACCOUNT_MEMORY_SIZE];
+} MatrixOlmAccount;
+
+bool
+MatrixOlmAccountInit(
+    MatrixOlmAccount * account);
+
+
+// Matrix Olm Session
 
 typedef struct MatrixOlmSession {
     const char * deviceId;
@@ -72,6 +102,7 @@ MatrixOlmSessionEncrypt(
     char * outBuffer, int outBufferCap);
 
 
+// Matrix Megolm Session
 
 typedef struct MatrixMegolmInSession {
     OlmInboundGroupSession * session;
@@ -99,10 +130,10 @@ MatrixMegolmOutSessionEncrypt(
     char * outBuffer, int outBufferCap);
 
 
+// Matrix Client
 
 typedef struct MatrixClient {
-    OlmAccount * olmAccount;
-    char olmAccountMemory[OLM_ACCOUNT_MEMORY_SIZE];
+    MatrixOlmAccount olmAccount;
 
     MatrixMegolmInSession megolmInSessions[NUM_MEGOLM_SESSIONS];
     int numMegolmInSessions;
@@ -143,6 +174,24 @@ MatrixClientSetDeviceId(
     const char * deviceId);
 
 bool
+MatrixClientSetUserId(
+    MatrixClient * client,
+    const char * userId);
+
+bool
+MatrixClientGenerateOnetimeKeys(
+    MatrixClient * client,
+    int numberOfKeys);
+
+bool
+MatrixClientUploadOnetimeKeys(
+    MatrixClient * client);
+
+bool
+MatrixClientUploadDeviceKeys(
+    MatrixClient * client);
+
+bool
 MatrixClientLoginPassword(
     MatrixClient * client,
     const char * username,
@@ -170,6 +219,12 @@ MatrixClientSync(
 
 bool
 MatrixClientShareMegolmOutSession(
+    MatrixClient * client,
+    const char * deviceId,
+    MatrixMegolmOutSession * session);
+
+bool
+MatrixClientShareMegolmOutSessionTest(
     MatrixClient * client,
     const char * deviceId,
     MatrixMegolmOutSession * session);
