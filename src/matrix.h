@@ -286,6 +286,10 @@ MatrixHttpInit(
     MatrixClient * client);
 
 bool
+MatrixHttpConnect(
+    MatrixClient * client);
+
+bool
 MatrixHttpDeinit(
     MatrixClient * client);
 

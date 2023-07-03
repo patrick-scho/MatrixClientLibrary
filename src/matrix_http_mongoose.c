@@ -58,6 +58,11 @@ MatrixHttpCallback(
 
         printf("received[%d]:\n%.*s\n", conn->dataLen, conn->dataLen, conn->data);
     }
+    if (ev == MG_EV_CLOSE)
+    {
+        conn->connection = NULL;
+        conn->connected = false;
+    }
 }
 
 bool
@@ -71,6 +76,16 @@ MatrixHttpInit(
     
     mg_mgr_init(&conn->mgr);
 
+    return MatrixHttpConnect(client);
+}
+
+bool
+MatrixHttpConnect(
+    MatrixClient * client)
+{
+    MatrixHttpConnection * conn =
+        (MatrixHttpConnection *)client->httpUserData;
+    
     struct mg_connection * c =
         mg_http_connect(&conn->mgr, client->server, MatrixHttpCallback, client);
 
@@ -101,6 +116,8 @@ MatrixHttpGet(
     bool authenticated)
 {
     MatrixHttpConnection * conn = (MatrixHttpConnection *)client->httpUserData;
+    if (! conn->connected)
+        MatrixHttpConnect(client);
 
     conn->dataReceived = false;
 
@@ -142,6 +159,8 @@ MatrixHttpPost(
     bool authenticated)
 {
     MatrixHttpConnection * conn = (MatrixHttpConnection *)client->httpUserData;
+    if (! conn->connected)
+        MatrixHttpConnect(client);
 
     conn->dataReceived = false;
 
@@ -187,6 +206,8 @@ MatrixHttpPut(
     bool authenticated)
 {
     MatrixHttpConnection * conn = (MatrixHttpConnection *)client->httpUserData;
+    if (! conn->connected)
+        MatrixHttpConnect(client);
 
     conn->dataReceived = false;
 

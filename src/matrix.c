@@ -22,8 +22,10 @@
 #define KEYS_QUERY_REQUEST_SIZE 256
 #define KEYS_QUERY_RESPONSE_SIZE 1024
 
-#define UPLOAD_KEYS_REQUEST_SIZE 512
-#define UPLOAD_KEYS_REQUEST_SIGNED_SIZE 1024
+#define KEYS_UPLOAD_URL "/_matrix/client/v3/keys/upload"
+#define KEYS_UPLOAD_REQUEST_SIZE 1024
+#define KEYS_UPLOAD_REQUEST_SIGNED_SIZE 2048
+#define KEYS_UPLOAD_RESPONSE_SIZE 2048
 
 #define JSON_QUERY_SIZE 128
 
@@ -301,13 +303,14 @@ MatrixClientGenerateOnetimeKeys(
     return res != olm_error();
 }
 
+// https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3keysupload
 bool
 MatrixClientUploadOnetimeKeys(
     MatrixClient * client)
 {
-    static char requestBuffer[UPLOAD_KEYS_REQUEST_SIZE];
+    static char requestBuffer[KEYS_UPLOAD_REQUEST_SIZE];
 
-    mjson_snprintf(requestBuffer, UPLOAD_KEYS_REQUEST_SIZE,
+    mjson_snprintf(requestBuffer, KEYS_UPLOAD_REQUEST_SIZE,
         "{\"one_time_keys\":{");
 
     static char onetimeKeysBuffer[1024];
@@ -332,27 +335,33 @@ MatrixClientUploadOnetimeKeys(
             keyJson, JSON_ONETIME_KEY_SIZE,
             keyJsonSigned, JSON_ONETIME_KEY_SIGNED_SIZE);
         
-        mjson_snprintf(requestBuffer+strlen(requestBuffer), UPLOAD_KEYS_REQUEST_SIZE-strlen(requestBuffer),
+        mjson_snprintf(requestBuffer+strlen(requestBuffer), KEYS_UPLOAD_REQUEST_SIZE-strlen(requestBuffer),
             "\"signed_curve25519:%.*s\":%s,",
             klen-2, keys + koff+1,
             keyJsonSigned);
     }
 
-    mjson_snprintf(requestBuffer+strlen(requestBuffer), UPLOAD_KEYS_REQUEST_SIZE-strlen(requestBuffer),
+    mjson_snprintf(requestBuffer+strlen(requestBuffer)-1, KEYS_UPLOAD_REQUEST_SIZE-strlen(requestBuffer),
         "}}");
 
-    printf("%s\n", requestBuffer);
+    static char responseBuffer[KEYS_UPLOAD_RESPONSE_SIZE];
+    MatrixHttpPost(client,
+        KEYS_UPLOAD_URL,
+        requestBuffer,
+        responseBuffer, KEYS_UPLOAD_RESPONSE_SIZE,
+        true);
 
     return true;
 }
 
+// https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3keysupload
 bool
 MatrixClientUploadDeviceKeys(
     MatrixClient * client)
 {
-    static char deviceKeysBuffer[UPLOAD_KEYS_REQUEST_SIZE];
+    static char deviceKeysBuffer[KEYS_UPLOAD_REQUEST_SIZE];
 
-    mjson_snprintf(deviceKeysBuffer, UPLOAD_KEYS_REQUEST_SIZE,
+    mjson_snprintf(deviceKeysBuffer, KEYS_UPLOAD_REQUEST_SIZE,
         "{\"device_keys\":{"
             "\"algorithms\":[\"m.olm.v1.curve25519-aes-sha2\",\"m.megolm.v1.aes-sha2\"],"
             "\"device_id\":\"%s\","
@@ -367,12 +376,18 @@ MatrixClientUploadDeviceKeys(
         client->deviceId, client->signingKey,
         client->userId);
 
-    static char deviceKeysSignedBuffer[UPLOAD_KEYS_REQUEST_SIGNED_SIZE];
+    static char deviceKeysSignedBuffer[KEYS_UPLOAD_REQUEST_SIGNED_SIZE];
     JsonSign(client,
-        deviceKeysBuffer, UPLOAD_KEYS_REQUEST_SIZE,
-        deviceKeysSignedBuffer, UPLOAD_KEYS_REQUEST_SIZE);
+        deviceKeysBuffer, KEYS_UPLOAD_REQUEST_SIZE,
+        deviceKeysSignedBuffer, KEYS_UPLOAD_REQUEST_SIZE);
 
-    printf("%s\n", deviceKeysSignedBuffer);
+
+    static char responseBuffer[KEYS_UPLOAD_RESPONSE_SIZE];
+    MatrixHttpPost(client,
+        KEYS_UPLOAD_URL,
+        deviceKeysSignedBuffer,
+        responseBuffer, KEYS_UPLOAD_RESPONSE_SIZE,
+        true);
 
     return true;
 }

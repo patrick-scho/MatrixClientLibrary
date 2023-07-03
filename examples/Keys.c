@@ -21,10 +21,10 @@ main(void)
     MatrixClientSetUserId(&client, USER_ID);
 
     MatrixClientGenerateOnetimeKeys(&client,
-        10);
+        2);
     
-    MatrixClientUploadDeviceKeys(&client);
     MatrixClientUploadOnetimeKeys(&client);
+    MatrixClientUploadDeviceKeys(&client);
         
     MatrixHttpDeinit(&client);
 
