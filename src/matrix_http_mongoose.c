@@ -220,20 +220,6 @@ MatrixHttpPut(
     else
         authorizationHeader[0] = '\0';
 
-    printf("PUT %s HTTP/1.0\r\n"
-            "Host: %.*s\r\n"
-            "%s"
-            "Content-Type: application/json\r\n"
-            "Content-Length: %d\r\n"
-            "\r\n"
-            "%s"
-            "\r\n",
-            url,
-            host.len, host.ptr,
-            authorizationHeader,
-            strlen(requestBuffer),
-            requestBuffer);
-
     mg_printf(conn->connection,
             "PUT %s HTTP/1.0\r\n"
             "Host: %.*s\r\n"

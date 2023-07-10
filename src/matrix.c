@@ -9,7 +9,7 @@
 #define LOGIN_RESPONSE_SIZE 1024
 #define LOGIN_URL "/_matrix/client/v3/login"
 
-#define ENCRYPTED_REQUEST_SIZE 512
+#define ENCRYPTED_REQUEST_SIZE (1024*5)
 #define ENCRYPTED_EVENT_SIZE 1024
 #define ROOMEVENT_REQUEST_SIZE 256
 #define ROOMEVENT_RESPONSE_SIZE 1024
@@ -40,7 +40,7 @@ Randomize(
     uint8_t * random,
     int randomLen)
 {
-    static bool first = false;
+    static bool first = true;
     if (first) { srand(time(0)); first = false; }
 
     for (int i = 0; i < randomLen; i++)
@@ -133,7 +133,7 @@ MatrixOlmAccountInit(
 
 // TODO: in/outbound sessions
 bool
-MatrixOlmSessionFrom(
+MatrixOlmSessionTo(
     MatrixOlmSession * session,
     OlmAccount * olmAccount,
     const char * deviceId,
@@ -150,11 +150,16 @@ MatrixOlmSessionFrom(
     static uint8_t random[OLM_OUTBOUND_SESSION_RANDOM_SIZE];
     Randomize(random, OLM_OUTBOUND_SESSION_RANDOM_SIZE);
 
-    olm_create_outbound_session(session->session,
-        olmAccount,
-        deviceKey, strlen(deviceKey),
-        deviceOnetimeKey, strlen(deviceOnetimeKey),
-        random, OLM_OUTBOUND_SESSION_RANDOM_SIZE);
+    size_t res =
+        olm_create_outbound_session(session->session,
+            olmAccount,
+            deviceKey, strlen(deviceKey),
+            deviceOnetimeKey, strlen(deviceOnetimeKey),
+            random, OLM_OUTBOUND_SESSION_RANDOM_SIZE);
+    
+    if (res == olm_error()) {
+        printf("error olm: %s\n", olm_account_last_error(olmAccount));
+    }
 
     return session->session != NULL;
 }
@@ -455,8 +460,6 @@ MatrixClientClaimOnetimeKey(
     
     mjson_get_string(keyObject + voff, vlen,
         "$.key", outOnetimeKey, outOnetimeKeyCap);
-
-    printf("onetime key: %s\n", outOnetimeKey);
     
     // TODO: verify signature
     
@@ -579,15 +582,15 @@ MatrixClientSendEventEncrypted(
     sprintf(encryptedEventBuffer,
         "{"
         "\"algorithm\":\"m.megolm.v1.aes-sha2\","
-        "\"sender_key\":\"%s\","
         "\"ciphertext\":\"%s\","
-        "\"session_id\":\"%s\","
-        "\"device_id\":\"%s\""
+        "\"device_id\":\"%s\","
+        "\"sender_key\":\"%s\","
+        "\"session_id\":\"%s\""
         "}",
-        senderKey,
         encryptedBuffer,
-        sessionId,
-        deviceId);
+        deviceId,
+        senderKey,
+        sessionId);
 
     // send
     return MatrixClientSendEvent(client,
@@ -630,21 +633,21 @@ MatrixClientShareMegolmOutSession(
         session->key
     );
 
-    // get olm session
-    MatrixOlmSession * olmSession;
-    MatrixClientGetOlmSession(client, userId, deviceId, &olmSession);
+    // // get olm session
+    // MatrixOlmSession * olmSession;
+    // MatrixClientGetOlmSession(client, userId, deviceId, &olmSession);
 
-    // encrypt
-    char encryptedBuffer[KEY_SHARE_EVENT_LEN];
-    MatrixOlmSessionEncrypt(olmSession,
-        eventBuffer,
-        encryptedBuffer, KEY_SHARE_EVENT_LEN);
+    // // encrypt
+    // char encryptedBuffer[KEY_SHARE_EVENT_LEN];
+    // MatrixOlmSessionEncrypt(olmSession,
+    //     eventBuffer,
+    //     encryptedBuffer, KEY_SHARE_EVENT_LEN);
 
     // send
     MatrixClientSendToDeviceEncrypted(client,
-        client->userId,
+        userId,
         deviceId,
-        encryptedBuffer,
+        eventBuffer,
         "m.room_key");
 
     return true;
@@ -757,7 +760,7 @@ MatrixClientGetOlmSession(
             deviceId,
             onetimeKey, ONETIME_KEY_SIZE);
 
-        MatrixOlmSessionFrom(
+        MatrixOlmSessionTo(
             &client->olmSessions[client->numOlmSessions],
             client->olmAccount.account,
             deviceId,
@@ -826,7 +829,6 @@ MatrixClientSendToDeviceEncrypted(
     // create event json
     char deviceKey[DEVICE_KEY_SIZE];
     MatrixClientGetDeviceKey(client, deviceId, deviceKey, DEVICE_KEY_SIZE);
-    const char * senderKey = client->deviceKey;
     
     static char eventBuffer[TODEVICE_EVENT_SIZE];
     sprintf(eventBuffer,
@@ -858,19 +860,21 @@ MatrixClientSendToDeviceEncrypted(
     static char encryptedEventBuffer[ENCRYPTED_EVENT_SIZE];
     sprintf(encryptedEventBuffer,
         "{"
-        "\"algorithm\":\"m.megolm.v1.aes-sha2\","
-        "\"sender_key\":\"%s\","
+        "\"algorithm\":\"m.olm.v1.curve25519-aes-sha2\","
         "\"ciphertext\":{"
           "\"%s\":{"
             "\"body\":\"%s\","
-            "\"type\":\"%d\""
+            "\"type\":%d"
           "}"
-        "}"
+        "},"
+        "\"device_id\":\"%s\","
+        "\"sender_key\":\"%s\""
         "}",
-        senderKey,
         deviceKey,
         encryptedBuffer,
-        olmSession->type);
+        0, //olmSession->type,
+        client->deviceId,
+        client->deviceKey);
 
     // send
     return MatrixClientSendToDevice(
@@ -908,9 +912,16 @@ MatrixClientGetDeviceKey(
     const char * deviceId,
     char * outDeviceKey, int outDeviceKeyCap)
 {
+    MatrixDevice * device;
+    
+    if (MatrixClientFindDevice(client, deviceId, &device))
+    {
+        strncpy(outDeviceKey, device->deviceKey, outDeviceKeyCap);
+        return true;
+    }
+
     MatrixClientRequestDeviceKeys(client);
     
-    MatrixDevice * device;
     if (MatrixClientFindDevice(client, deviceId, &device))
     {
         strncpy(outDeviceKey, device->deviceKey, outDeviceKeyCap);

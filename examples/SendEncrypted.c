@@ -23,17 +23,19 @@ main(void)
     MatrixClientSetUserId(&client,
         USER_ID);
 
-    // MatrixMegolmOutSession megolmOutSession;
-    // MatrixMegolmOutSessionInit(&megolmOutSession);
 
-    // MatrixClientSetMegolmOutSession(&client,
-    //     ROOM_ID,
-    //     megolmOutSession);
+    MatrixClientUploadDeviceKeys(&client);
 
     MatrixClientSendEventEncrypted(&client,
         ROOM_ID,
         "m.room.message",
         "{\"body\":\"Hello\",\"msgtype\":\"m.text\"}");
+
+    MatrixClientSendToDeviceEncrypted(&client,
+        USER_ID,
+        "ULZZOKJBYN",
+        "{}",
+        "m.dummy");
 
     MatrixClientShareMegolmOutSession(&client,
         USER_ID,

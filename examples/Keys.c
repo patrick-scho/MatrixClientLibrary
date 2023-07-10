@@ -25,6 +25,8 @@ main(void)
     
     MatrixClientUploadOnetimeKeys(&client);
     MatrixClientUploadDeviceKeys(&client);
+
+    printf("device key: %s\n", client.deviceKey);
         
     MatrixHttpDeinit(&client);
 

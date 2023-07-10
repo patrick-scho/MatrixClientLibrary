@@ -93,7 +93,7 @@ typedef struct MatrixOlmSession {
 } MatrixOlmSession;
 
 bool
-MatrixOlmSessionFrom(
+MatrixOlmSessionTo(
     MatrixOlmSession * session,
     OlmAccount * olmAccount,
     const char * deviceId,

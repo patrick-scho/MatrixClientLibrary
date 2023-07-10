@@ -3,7 +3,6 @@
 
 #define SERVER       "https://matrix.org"
 #define ACCESS_TOKEN "syt_cHNjaG8_yBvTjVTquGCikvsAenOJ_49mBMO"
-#define DEVICE_ID    "MAZNCCZLBR"
 
 int
 main(void)
@@ -17,9 +16,9 @@ main(void)
     MatrixClientSetAccessToken(&client,
         ACCESS_TOKEN);
 
-    static char syncBuffer[20000];
+    static char syncBuffer[40000];
     MatrixClientSync(&client,
-        syncBuffer, 20000);
+        syncBuffer, 40000);
     printf("%s", syncBuffer);
         
     MatrixHttpDeinit(&client);
