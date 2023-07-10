@@ -21,6 +21,7 @@
 #define OLM_IDENTITY_KEYS_JSON_SIZE 128
 #define DEVICE_KEY_SIZE 44
 #define SIGNING_KEY_SIZE 44
+#define ONETIME_KEY_SIZE 44
 
 #define KEY_SHARE_EVENT_LEN 1024
 
@@ -29,8 +30,9 @@
 
 #define OLM_SESSION_MEMORY_SIZE 3352
 #define OLM_ENCRYPT_RANDOM_SIZE 32
+#define OLM_OUTBOUND_SESSION_RANDOM_SIZE (32*2)
 
-#define OLM_ONETIME_KEYS_RANDOM_SIZE 32*10
+#define OLM_ONETIME_KEYS_RANDOM_SIZE (32*10)
 #define OLM_KEY_ID_SIZE 32
 
 #define OLM_SIGNATURE_SIZE 128
@@ -53,11 +55,11 @@ Randomize(uint8_t * random, int randomLen);
 
 bool
 JsonEscape(
-    char * sIn, int sInLen,
+    const char * sIn, int sInLen,
     char * sOut, int sOutCap);
     
 bool JsonSign(
-    char * sIn, int sInLen,
+    const char * sIn, int sInLen,
     char * sOut, int sOutCap);
 
 // Matrix Device
@@ -91,9 +93,12 @@ typedef struct MatrixOlmSession {
 } MatrixOlmSession;
 
 bool
-MatrixOlmSessionInit(
+MatrixOlmSessionFrom(
     MatrixOlmSession * session,
-    const char * deviceId);
+    OlmAccount * olmAccount,
+    const char * deviceId,
+    const char * deviceKey,
+    const char * deviceOnetimeKey);
 
 bool
 MatrixOlmSessionEncrypt(
@@ -192,6 +197,13 @@ MatrixClientUploadDeviceKeys(
     MatrixClient * client);
 
 bool
+MatrixClientClaimOnetimeKey(
+    MatrixClient * client,
+    const char * userId,
+    const char * deviceId,
+    char * outOnetimeKey, int outOnetimeKeyCap);
+
+bool
 MatrixClientLoginPassword(
     MatrixClient * client,
     const char * username,
@@ -215,11 +227,12 @@ MatrixClientSendEventEncrypted(
 bool
 MatrixClientSync(
     MatrixClient * client,
-    char * outSyncBuffer, int outSyncCap);
+    char * outSync, int outSyncCap);
 
 bool
 MatrixClientShareMegolmOutSession(
     MatrixClient * client,
+    const char * userId,
     const char * deviceId,
     MatrixMegolmOutSession * session);
 
@@ -244,6 +257,7 @@ MatrixClientSetMegolmOutSession(
 bool
 MatrixClientGetOlmSession(
     MatrixClient * client,
+    const char * userId,
     const char * deviceId,
     MatrixOlmSession ** outSession);
 

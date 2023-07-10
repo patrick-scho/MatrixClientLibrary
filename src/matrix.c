@@ -15,17 +15,21 @@
 #define ROOMEVENT_RESPONSE_SIZE 1024
 #define ROOMEVENT_URL "/_matrix/client/v3/rooms/%s/send/%s/%d"
 
-#define TODEVICE_EVENT_SIZE 512
+#define TODEVICE_EVENT_SIZE (1024*5)
 #define TODEVICE_URL "/_matrix/client/v3/sendToDevice/%s/%d"
 
 #define KEYS_QUERY_URL "/_matrix/client/v3/keys/query"
 #define KEYS_QUERY_REQUEST_SIZE 256
-#define KEYS_QUERY_RESPONSE_SIZE 1024
+#define KEYS_QUERY_RESPONSE_SIZE (1024*10)
 
 #define KEYS_UPLOAD_URL "/_matrix/client/v3/keys/upload"
 #define KEYS_UPLOAD_REQUEST_SIZE 1024
 #define KEYS_UPLOAD_REQUEST_SIGNED_SIZE 2048
 #define KEYS_UPLOAD_RESPONSE_SIZE 2048
+
+#define KEYS_CLAIM_URL "/_matrix/client/v3/keys/claim"
+#define KEYS_CLAIM_REQUEST_SIZE 1024
+#define KEYS_CLAIM_RESPONSE_SIZE 1024
 
 #define JSON_QUERY_SIZE 128
 
@@ -47,7 +51,7 @@ Randomize(
 
 bool
 JsonEscape(
-    char * sIn, int sInLen,
+    const char * sIn, int sInLen,
     char * sOut, int sOutCap)
 {
     int sOutIndex = 0;
@@ -74,7 +78,7 @@ JsonEscape(
 
 bool JsonSign(
     MatrixClient * client,
-    char * sIn, int sInLen,
+    const char * sIn, int sInLen,
     char * sOut, int sOutCap)
 {
     static char signature[OLM_SIGNATURE_SIZE];
@@ -129,19 +133,28 @@ MatrixOlmAccountInit(
 
 // TODO: in/outbound sessions
 bool
-MatrixOlmSessionInit(
+MatrixOlmSessionFrom(
     MatrixOlmSession * session,
-    const char * deviceId)
+    OlmAccount * olmAccount,
+    const char * deviceId,
+    const char * deviceKey,
+    const char * deviceOnetimeKey)
 {
     memset(session, 0, sizeof(MatrixOlmSession));
-
-    static uint8_t random[MEGOLM_INIT_RANDOM_SIZE];
-    Randomize(random, MEGOLM_INIT_RANDOM_SIZE);
 
     session->deviceId = deviceId;
 
     session->session =
         olm_session(session->memory);
+
+    static uint8_t random[OLM_OUTBOUND_SESSION_RANDOM_SIZE];
+    Randomize(random, OLM_OUTBOUND_SESSION_RANDOM_SIZE);
+
+    olm_create_outbound_session(session->session,
+        olmAccount,
+        deviceKey, strlen(deviceKey),
+        deviceOnetimeKey, strlen(deviceOnetimeKey),
+        random, OLM_OUTBOUND_SESSION_RANDOM_SIZE);
 
     return session->session != NULL;
 }
@@ -392,6 +405,64 @@ MatrixClientUploadDeviceKeys(
     return true;
 }
 
+// https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3keysclaim
+bool
+MatrixClientClaimOnetimeKey(
+    MatrixClient * client,
+    const char * userId,
+    const char * deviceId,
+    char * outOnetimeKey, int outOnetimeKeyCap)
+{
+    static char requestBuffer[KEYS_CLAIM_REQUEST_SIZE];
+    mjson_snprintf(requestBuffer, KEYS_CLAIM_REQUEST_SIZE,
+    "{"
+      "\"one_time_keys\": {"
+        "\"%s\": {"
+          "\"%s\": \"signed_curve25519\""
+        "}"
+      "},"
+      "\"timeout\": 10000"
+    "}",
+    userId,
+    deviceId);
+
+    static char responseBuffer[KEYS_CLAIM_RESPONSE_SIZE];
+    MatrixHttpPost(client,
+        KEYS_CLAIM_URL,
+        requestBuffer,
+        responseBuffer, KEYS_CLAIM_RESPONSE_SIZE,
+        true);
+    
+    char userIdEscaped[USER_ID_SIZE];
+    JsonEscape(userId, strlen(userId),
+        userIdEscaped, USER_ID_SIZE);
+    
+    static char query[JSON_QUERY_SIZE];
+    snprintf(query, JSON_QUERY_SIZE,
+        "$.one_time_keys.%s.%s",
+        userIdEscaped,
+        deviceId);
+    
+    const char * keyObject;
+    int keyObjectSize;
+    mjson_find(responseBuffer, strlen(responseBuffer),
+        query,
+        &keyObject, &keyObjectSize);
+    
+    int koff, klen, voff, vlen, vtype;
+    mjson_next(keyObject, keyObjectSize, 0,
+        &koff, &klen, &voff, &vlen, &vtype);
+    
+    mjson_get_string(keyObject + voff, vlen,
+        "$.key", outOnetimeKey, outOnetimeKeyCap);
+
+    printf("onetime key: %s\n", outOnetimeKey);
+    
+    // TODO: verify signature
+    
+    return true;
+}
+
 // https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3login
 bool
 MatrixClientLoginPassword(
@@ -541,11 +612,12 @@ MatrixClientSync(
 bool
 MatrixClientShareMegolmOutSession(
     MatrixClient * client,
+    const char * userId,
     const char * deviceId,
     MatrixMegolmOutSession * session)
 {
     // generate room key event
-    char eventBuffer[KEY_SHARE_EVENT_LEN];
+    static char eventBuffer[KEY_SHARE_EVENT_LEN];
     sprintf(eventBuffer,
         "{"
             "\"algorithm\":\"m.megolm.v1.aes-sha2\","
@@ -560,7 +632,7 @@ MatrixClientShareMegolmOutSession(
 
     // get olm session
     MatrixOlmSession * olmSession;
-    MatrixClientGetOlmSession(client, deviceId, &olmSession);
+    MatrixClientGetOlmSession(client, userId, deviceId, &olmSession);
 
     // encrypt
     char encryptedBuffer[KEY_SHARE_EVENT_LEN];
@@ -659,6 +731,7 @@ MatrixClientGetMegolmOutSession(
 bool
 MatrixClientGetOlmSession(
     MatrixClient * client,
+    const char * userId,
     const char * deviceId,
     MatrixOlmSession ** outSession)
 {
@@ -673,9 +746,23 @@ MatrixClientGetOlmSession(
 
     if (client->numOlmSessions < NUM_OLM_SESSIONS)
     {
-        MatrixOlmSessionInit(
+        static char deviceKey[DEVICE_KEY_SIZE];
+        MatrixClientGetDeviceKey(client,
+            deviceId,
+            deviceKey, DEVICE_KEY_SIZE);
+
+        char onetimeKey[ONETIME_KEY_SIZE];
+        MatrixClientClaimOnetimeKey(client,
+            userId,
+            deviceId,
+            onetimeKey, ONETIME_KEY_SIZE);
+
+        MatrixOlmSessionFrom(
             &client->olmSessions[client->numOlmSessions],
-            deviceId);
+            client->olmAccount.account,
+            deviceId,
+            deviceKey,
+            onetimeKey);
 
         *outSession = &client->olmSessions[client->numOlmSessions];
         
@@ -734,7 +821,7 @@ MatrixClientSendToDeviceEncrypted(
 {
     // get olm session
     MatrixOlmSession * olmSession;
-    MatrixClientGetOlmSession(client, deviceId, &olmSession);
+    MatrixClientGetOlmSession(client, userId, deviceId, &olmSession);
 
     // create event json
     char deviceKey[DEVICE_KEY_SIZE];
@@ -838,68 +925,65 @@ bool
 MatrixClientRequestDeviceKeys(
     MatrixClient * client)
 {
-    char userIdEscaped[USER_ID_SIZE];
+    static char userIdEscaped[USER_ID_SIZE];
     JsonEscape(client->userId, strlen(client->userId),
         userIdEscaped, USER_ID_SIZE);
 
-    char request[KEYS_QUERY_REQUEST_SIZE];
+    static char request[KEYS_QUERY_REQUEST_SIZE];
     snprintf(request, KEYS_QUERY_REQUEST_SIZE,
-        "{\"device_keys\":{\"%s\":[]}}", userIdEscaped);
+        "{\"device_keys\":{\"%s\":[]}}", client->userId);
 
-    char responseBuffer[KEYS_QUERY_RESPONSE_SIZE];
+    static char responseBuffer[KEYS_QUERY_RESPONSE_SIZE];
     bool requestResult = MatrixHttpPost(client,
         KEYS_QUERY_URL,
         request,
         responseBuffer, KEYS_QUERY_RESPONSE_SIZE,
         true);
 
-    if (requestResult)
-    {
-        // query for retrieving device keys for user id
-        char query[JSON_QUERY_SIZE];
-        snprintf(query, JSON_QUERY_SIZE,
-            "$.device_keys.%s", userIdEscaped);
-        
-        const char * s;
-        int slen;
-        mjson_find(responseBuffer, strlen(responseBuffer),
-            query, &s, &slen);
-
-        // loop over keys
-        
-        int koff, klen, voff, vlen, vtype, off;
-        for (off = 0; (off = mjson_next(s, slen, off, &koff, &klen,
-                                        &voff, &vlen, &vtype)) != 0; ) {
-            const char * key = s + koff;
-            const char * val = s + voff;
-
-            // set device id, "key" is the JSON key
-            MatrixDevice d;
-            strncpy(d.deviceId, key, klen);
-
-            // look for device key in value
-            char deviceKeyQuery[JSON_QUERY_SIZE];
-            snprintf(deviceKeyQuery, JSON_QUERY_SIZE,
-                "$.keys.curve25519:%.*s", klen, key);
-            mjson_get_string(val, vlen,
-                deviceKeyQuery, d.deviceKey, DEVICE_KEY_SIZE);
-
-            // add device
-            if (client->numDevices < NUM_DEVICES)
-            {
-                client->devices[client->numDevices] = d;
-                client->numDevices++;
-            }
-            else
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-    else
-    {
+    if (! requestResult)
         return false;
+
+    // query for retrieving device keys for user id
+    static char query[JSON_QUERY_SIZE];
+    snprintf(query, JSON_QUERY_SIZE,
+        "$.device_keys.%s", userIdEscaped);
+    
+    const char * s;
+    int slen;
+    mjson_find(responseBuffer, strlen(responseBuffer),
+        query, &s, &slen);
+
+    // loop over keys
+    
+    int koff, klen, voff, vlen, vtype, off = 0;
+    for (off = 0; (off = mjson_next(s, slen, off, &koff, &klen,
+                                    &voff, &vlen, &vtype)) != 0; ) {
+        const char * key = s + koff;
+        const char * val = s + voff;
+
+        // set device id, "key" is the JSON key
+        MatrixDevice d;
+        snprintf(d.deviceId, DEVICE_ID_SIZE,
+            "%.*s", klen-2, key+1);
+
+        // look for device key in value
+        static char deviceKeyQuery[JSON_QUERY_SIZE];
+        snprintf(deviceKeyQuery, JSON_QUERY_SIZE,
+            "$.keys.curve25519:%s", d.deviceId);
+        mjson_get_string(val, vlen,
+            deviceKeyQuery, d.deviceKey, DEVICE_KEY_SIZE);
+
+        // add device
+        if (client->numDevices < NUM_DEVICES)
+        {
+            client->devices[client->numDevices] = d;
+            client->numDevices++;
+        }
+        else
+        {
+            return false;
+        }
     }
+
+    return true;
 }

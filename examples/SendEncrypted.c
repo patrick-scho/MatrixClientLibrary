@@ -35,7 +35,8 @@ main(void)
         "m.room.message",
         "{\"body\":\"Hello\",\"msgtype\":\"m.text\"}");
 
-    MatrixClientShareMegolmOutSessionTest(&client,
+    MatrixClientShareMegolmOutSession(&client,
+        USER_ID,
         "ULZZOKJBYN",
         &client.megolmOutSessions[0]);
         
