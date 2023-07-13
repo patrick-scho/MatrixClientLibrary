@@ -50,18 +50,6 @@
 #define NUM_OLM_SESSIONS 10
 #define NUM_DEVICES 10
 
-void
-Randomize(uint8_t * random, int randomLen);
-
-bool
-JsonEscape(
-    const char * sIn, int sInLen,
-    char * sOut, int sOutCap);
-    
-bool JsonSign(
-    const char * sIn, int sInLen,
-    char * sOut, int sOutCap);
-
 // Matrix Device
 
 typedef struct MatrixDevice {
@@ -329,5 +317,20 @@ MatrixHttpPut(
     const char * requestBuffer,
     char * outResponseBuffer, int outResponseCap,
     bool authenticated);
+
+// util
+
+void
+Randomize(uint8_t * random, int randomLen);
+
+bool
+JsonEscape(
+    const char * sIn, int sInLen,
+    char * sOut, int sOutCap);
+    
+bool JsonSign(
+    MatrixClient * client,
+    const char * sIn, int sInLen,
+    char * sOut, int sOutCap);
 
 #endif

@@ -10,7 +10,7 @@
 #define LOGIN_URL "/_matrix/client/v3/login"
 
 #define ENCRYPTED_REQUEST_SIZE (1024*5)
-#define ENCRYPTED_EVENT_SIZE 1024
+#define ENCRYPTED_EVENT_SIZE (1024*10)
 #define ROOMEVENT_REQUEST_SIZE 256
 #define ROOMEVENT_RESPONSE_SIZE 1024
 #define ROOMEVENT_URL "/_matrix/client/v3/rooms/%s/send/%s/%d"
