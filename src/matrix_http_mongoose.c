@@ -56,7 +56,7 @@ MatrixHttpCallback(
         conn->dataLen = hm->body.len;
         conn->dataReceived = true;
 
-        printf("received[%d]:\n%.*s\n", conn->dataLen, conn->dataLen, conn->data);
+        //printf("received[%d]:\n%.*s\n", conn->dataLen, conn->dataLen, conn->data);
     }
     if (ev == MG_EV_CLOSE)
     {
@@ -86,7 +86,7 @@ MatrixHttpConnect(
     MatrixHttpConnection * conn =
         (MatrixHttpConnection *)client->httpUserData;
     
-    struct mg_connection * c =
+    //struct mg_connection * c =
         mg_http_connect(&conn->mgr, client->server, MatrixHttpCallback, client);
 
     while (! conn->connected)

@@ -1,6 +1,6 @@
 idf_component_register(SRCS
                             "../../../../ext/olm/src/account.cpp"
-                            "../../../../ext/olm/lib/crypto-algorithms/aes.c"
+                            #"../../../../ext/olm/lib/crypto-algorithms/aes.c"
                             "../../../../ext/olm/src/base64.cpp"
                             "../../../../ext/olm/src/cipher.cpp"
                             "../../../../ext/olm/src/crypto.cpp"

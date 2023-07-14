@@ -14,6 +14,8 @@
 #include <olm/olm.h>
 #include <matrix.h>
 
+#include <esp_wifi.h>
+
 #define SERVER       "https://matrix.org"
 #define ACCESS_TOKEN "syt_cHNjaG8_yBvTjVTquGCikvsAenOJ_49mBMO"
 #define DEVICE_ID    "MAZNCCZLBR"
@@ -26,6 +28,9 @@ app_main(void)
     MatrixClientInit(&client,
         SERVER);
     
+    void wifi_init(const char *ssid, const char *pass);
+    wifi_init("Hundehuette", "Affensicherespw55");
+
     MatrixHttpInit(&client);
 
     MatrixClientSetAccessToken(&client,

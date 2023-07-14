@@ -283,6 +283,7 @@ MatrixClientRequestDeviceKeys(
 
 
 
+
 bool
 MatrixHttpInit(
     MatrixClient * client);
