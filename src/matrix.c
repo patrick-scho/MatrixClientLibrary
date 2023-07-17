@@ -259,6 +259,58 @@ MatrixClientInit(
 }
 
 bool
+MatrixClientSave(
+    MatrixClient * client,
+    const char * filename)
+{
+    FILE * f = fopen(filename, "w");
+    
+    fwrite(client->deviceKey, 1, DEVICE_KEY_SIZE, f);
+    fwrite(client->signingKey, 1, DEVICE_KEY_SIZE, f);
+    fwrite(client->userId, 1, USER_ID_SIZE, f);
+    fwrite(client->server, 1, SERVER_SIZE, f);
+    fwrite(client->accessToken, 1, ACCESS_TOKEN_SIZE, f);
+    fwrite(client->deviceId, 1, DEVICE_ID_SIZE, f);
+    fwrite(client->expireMs, 1, EXPIRE_MS_SIZE, f);
+    fwrite(client->refreshToken, 1, REFRESH_TOKEN_SIZE, f);
+
+    fwrite(&client->numDevices, sizeof(int), 1, f);
+    for (int i = 0; i < client->numDevices; i++) {
+        fwrite(client->devices[i].deviceId, 1, DEVICE_ID_SIZE, f);
+        fwrite(client->devices[i].deviceKey, 1, DEVICE_KEY_SIZE, f);
+    }
+
+    fclose(f);
+    return true;
+}
+
+bool
+MatrixClientLoad(
+    MatrixClient * client,
+    const char * filename)
+{
+    FILE * f = fopen(filename, "r");
+    
+    fread(client->deviceKey, 1, DEVICE_KEY_SIZE, f);
+    fread(client->signingKey, 1, DEVICE_KEY_SIZE, f);
+    fread(client->userId, 1, USER_ID_SIZE, f);
+    fread(client->server, 1, SERVER_SIZE, f);
+    fread(client->accessToken, 1, ACCESS_TOKEN_SIZE, f);
+    fread(client->deviceId, 1, DEVICE_ID_SIZE, f);
+    fread(client->expireMs, 1, EXPIRE_MS_SIZE, f);
+    fread(client->refreshToken, 1, REFRESH_TOKEN_SIZE, f);
+
+    fread(&client->numDevices, sizeof(int), 1, f);
+    for (int i = 0; i < client->numDevices; i++) {
+        fread(client->devices[i].deviceId, 1, DEVICE_ID_SIZE, f);
+        fread(client->devices[i].deviceKey, 1, DEVICE_KEY_SIZE, f);
+    }
+
+    fclose(f);
+    return true;
+}
+
+bool
 MatrixClientSetAccessToken(
     MatrixClient * client,
     const char * accessToken)
@@ -270,6 +322,7 @@ MatrixClientSetAccessToken(
 
     for (int i = 0; i < accessTokenLen; i++)
         client->accessToken[i] = accessToken[i];
+    client->accessToken[accessTokenLen] = '\0';
 
     return true;
 }
@@ -286,6 +339,7 @@ MatrixClientSetDeviceId(
 
     for (int i = 0; i < deviceIdLen; i++)
         client->deviceId[i] = deviceId[i];
+    client->deviceId[deviceIdLen] = '\0';
 
     return true;
 }
@@ -302,6 +356,7 @@ MatrixClientSetUserId(
 
     for (int i = 0; i < userIdLen; i++)
         client->userId[i] = userId[i];
+    client->userId[userIdLen] = '\0';
 
     return true;
 }

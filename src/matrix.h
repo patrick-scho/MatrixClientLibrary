@@ -157,6 +157,16 @@ MatrixClientInit(
     const char * server);
 
 bool
+MatrixClientSave(
+    MatrixClient * client,
+    const char * filename);
+
+bool
+MatrixClientLoad(
+    MatrixClient * client,
+    const char * filename);
+
+bool
 MatrixClientSetAccessToken(
     MatrixClient * client,
     const char * accessToken);

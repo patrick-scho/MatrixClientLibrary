@@ -76,14 +76,13 @@ ExecuteCommand(
     const char * cmd,
     int nargs, char ** args
 ) {
+#define CHECK_ARGS(N, ARGS) if (nargs != N) { Usage(cmd, ARGS); return; }
     /**/ if (CheckCommand(cmd, "devicekey")) {
         printf("%s\n", client->deviceKey);
     }
     else if (CheckCommand(cmd, "genkeys")) {
-        if (nargs != 1) {
-            Usage(cmd, "<number of keys>");
-            return;
-        }
+        CHECK_ARGS(1, "<number of keys>")
+
         MatrixClientGenerateOnetimeKeys(client, atoi(args[0]));
     }
     else if (CheckCommand(cmd, "uploadkeys")) {
@@ -116,6 +115,40 @@ ExecuteCommand(
             "  ", mjson_print_fixed_buf, &fb);
         printf("%.*s\n", fb.len, fb.ptr);
     }
+    else if (CheckCommand(cmd, "save")) {
+        CHECK_ARGS(1, "<filename>")
+
+        MatrixClientSave(client, args[0]);
+    }
+    else if (CheckCommand(cmd, "load")) {
+        CHECK_ARGS(1, "<filename>")
+
+        MatrixClientLoad(client, args[0]);
+    }
+    else if (CheckCommand(cmd, "send")) {
+        CHECK_ARGS(2, "<room_id> <message>")
+
+        static char body[1024];
+        snprintf(body, 1024,
+            "{\"body\":\"%s\",\"msgtype\":\"m.text\"}",
+            args[1]);
+
+        printf("Sending %s to %s\n", body, args[0]);
+
+        MatrixClientSendEvent(client,
+            args[0],
+            "m.room.message",
+            body);
+    }
+    else if (CheckCommand(cmd, "setuserid")) {
+        CHECK_ARGS(1, "<user_id>")
+
+        MatrixClientSetUserId(client, args[0]);
+    }
+    else if (CheckCommand(cmd, "getuserid")) {
+        printf("User ID: %s\n", client->userId);
+    }
+#undef CHECK_ARGS
 }
 
 int
@@ -135,7 +168,7 @@ main(void)
         USER_ID);
 
     static char cmd[BUFFER_SIZE];
-    static char args_[BUFFER_SIZE][NUMBER_ARGS];
+    static char args_[NUMBER_ARGS][BUFFER_SIZE];
     char * args[NUMBER_ARGS];
     for (int i = 0; i < NUMBER_ARGS; i++)
         args[i] = args_[i];
