@@ -115,12 +115,24 @@ bool
 MatrixMegolmOutSessionInit(
     MatrixMegolmOutSession * session,
     const char * roomId);
-    
+
 bool
 MatrixMegolmOutSessionEncrypt(
     MatrixMegolmOutSession * session,
     const char * plaintext,
     char * outBuffer, int outBufferCap);
+
+bool
+MatrixMegolmOutSessionSave(
+    MatrixMegolmOutSession * session,
+    const char * filename,
+    const char * key);
+    
+bool
+MatrixMegolmOutSessionLoad(
+    MatrixMegolmOutSession * session,
+    const char * filename,
+    const char * key);
 
 
 // Matrix Client

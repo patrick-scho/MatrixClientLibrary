@@ -226,6 +226,67 @@ MatrixMegolmOutSessionEncrypt(
     return res != olm_error();
 }
 
+bool
+MatrixMegolmOutSessionSave(
+    MatrixMegolmOutSession * session,
+    const char * filename,
+    const char * key)
+{
+    FILE * f = fopen(filename, "w");
+
+    size_t roomIdLen = strlen(session->roomId);
+    fwrite(&roomIdLen, sizeof(size_t), 1, f);
+    fwrite(session->roomId, 1, roomIdLen, f);
+
+    size_t pickleBufferLen =
+        olm_pickle_outbound_group_session_length(
+            session->session);
+    void * pickleBuffer = malloc(pickleBufferLen);
+
+    olm_pickle_outbound_group_session(
+        session->session,
+        key, strlen(key),
+        pickleBuffer, pickleBufferLen);
+    
+    fwrite(&pickleBufferLen, sizeof(size_t), 1, f);
+    fwrite(pickleBuffer, 1, pickleBufferLen, f);
+    free(pickleBuffer);
+
+    fclose(f);
+
+    return true;
+}
+
+bool
+MatrixMegolmOutSessionLoad(
+    MatrixMegolmOutSession * session,
+    const char * filename,
+    const char * key)
+{
+    FILE * f = fopen(filename, "r");
+
+    size_t roomIdLen;
+    fread(&roomIdLen, sizeof(size_t), 1, f);
+    fread(session->roomId, 1, roomIdLen, f);
+
+    size_t pickleBufferLen;
+    fread(&pickleBufferLen, sizeof(size_t), 1, f);
+
+    void * pickleBuffer = malloc(pickleBufferLen);
+    fread(pickleBuffer, 1, pickleBufferLen, f);
+
+    olm_unpickle_outbound_group_session(
+        session->session,
+        key, strlen(key),
+        pickleBuffer, pickleBufferLen);
+    
+    free(pickleBuffer);
+
+    fclose(f);
+
+    return true;
+}
+
 
 
 bool
@@ -315,14 +376,9 @@ MatrixClientSetAccessToken(
     MatrixClient * client,
     const char * accessToken)
 {
-    int accessTokenLen = strlen(accessToken);
-
-    if (accessTokenLen > ACCESS_TOKEN_SIZE - 1)
-        return false;
-
-    for (int i = 0; i < accessTokenLen; i++)
+    for (int i = 0; i < ACCESS_TOKEN_SIZE-1; i++)
         client->accessToken[i] = accessToken[i];
-    client->accessToken[accessTokenLen] = '\0';
+    client->accessToken[ACCESS_TOKEN_SIZE-1] = '\0';
 
     return true;
 }
@@ -332,14 +388,9 @@ MatrixClientSetDeviceId(
     MatrixClient * client,
     const char * deviceId)
 {
-    int deviceIdLen = strlen(deviceId);
-
-    if (deviceIdLen > DEVICE_ID_SIZE - 1)
-        return false;
-
-    for (int i = 0; i < deviceIdLen; i++)
+    for (int i = 0; i < DEVICE_ID_SIZE-1; i++)
         client->deviceId[i] = deviceId[i];
-    client->deviceId[deviceIdLen] = '\0';
+    client->deviceId[DEVICE_ID_SIZE-1] = '\0';
 
     return true;
 }
@@ -349,14 +400,9 @@ MatrixClientSetUserId(
     MatrixClient * client,
     const char * userId)
 {
-    int userIdLen = strlen(userId);
-
-    if (userIdLen > USER_ID_SIZE - 1)
-        return false;
-
-    for (int i = 0; i < userIdLen; i++)
+    for (int i = 0; i < USER_ID_SIZE-1; i++)
         client->userId[i] = userId[i];
-    client->userId[userIdLen] = '\0';
+    client->userId[USER_ID_SIZE-1] = '\0';
 
     return true;
 }

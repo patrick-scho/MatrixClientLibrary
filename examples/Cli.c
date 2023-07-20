@@ -133,8 +133,6 @@ ExecuteCommand(
             "{\"body\":\"%s\",\"msgtype\":\"m.text\"}",
             args[1]);
 
-        printf("Sending %s to %s\n", body, args[0]);
-
         MatrixClientSendEvent(client,
             args[0],
             "m.room.message",
@@ -147,6 +145,43 @@ ExecuteCommand(
     }
     else if (CheckCommand(cmd, "getuserid")) {
         printf("User ID: %s\n", client->userId);
+    }
+    else if (CheckCommand(cmd, "sendencrypted")) {
+        CHECK_ARGS(2, "<room_id> <message>")
+
+        static char body[1024];
+        snprintf(body, 1024,
+            "{\"body\":\"%s\",\"msgtype\":\"m.text\"}",
+            args[1]);
+
+        MatrixClientSendEventEncrypted(client,
+            args[0],
+            "m.room.message",
+            body);
+    }
+    else if (CheckCommand(cmd, "sharesession")) {
+        CHECK_ARGS(2, "<user_id> <device_id>")
+
+        MatrixClientShareMegolmOutSession(&client,
+            args[0],
+            args[1],
+            &client->megolmOutSessions[0]);
+    }
+    else if (CheckCommand(cmd, "savesession")) {
+        CHECK_ARGS(2, "<filename> <key>")
+
+        MatrixMegolmOutSessionSave(
+            &client->megolmOutSessions[0],
+            args[0],
+            args[1]);
+    }
+    else if (CheckCommand(cmd, "loadsession")) {
+        CHECK_ARGS(2, "<filename> <key>")
+
+        MatrixMegolmOutSessionLoad(
+            &client->megolmOutSessions[0],
+            args[0],
+            args[1]);
     }
 #undef CHECK_ARGS
 }
