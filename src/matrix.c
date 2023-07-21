@@ -192,7 +192,7 @@ MatrixMegolmOutSessionInit(
     static uint8_t random[MEGOLM_INIT_RANDOM_SIZE];
     Randomize(random, MEGOLM_INIT_RANDOM_SIZE);
 
-    session->roomId = roomId;
+    strncpy(session->roomId, roomId, ROOM_ID_SIZE);
 
     session->session =
         olm_outbound_group_session(session->memory);
@@ -268,6 +268,8 @@ MatrixMegolmOutSessionLoad(
     size_t roomIdLen;
     fread(&roomIdLen, sizeof(size_t), 1, f);
     fread(session->roomId, 1, roomIdLen, f);
+    for (int i = roomIdLen; i < ROOM_ID_SIZE; i++)
+        session->roomId[i] = '\0';
 
     size_t pickleBufferLen;
     fread(&pickleBufferLen, sizeof(size_t), 1, f);
@@ -281,6 +283,9 @@ MatrixMegolmOutSessionLoad(
         pickleBuffer, pickleBufferLen);
     
     free(pickleBuffer);
+
+    olm_outbound_group_session_id(session->session, (uint8_t *)session->id, MEGOLM_SESSION_ID_SIZE);
+    olm_outbound_group_session_key(session->session, (uint8_t *)session->key, MEGOLM_SESSION_KEY_SIZE);
 
     fclose(f);
 
@@ -816,19 +821,29 @@ MatrixClientGetMegolmOutSession(
         }
     }
 
+    if (MatrixClientInitMegolmOutSession(client, roomId)) {
+        *outSession = &client->megolmOutSessions[client->numMegolmOutSessions-1];
+        return true;
+    }
+
+    return false;
+}
+
+bool
+MatrixClientInitMegolmOutSession(
+    MatrixClient * client,
+    const char * roomId)
+{
     if (client->numMegolmOutSessions < NUM_MEGOLM_SESSIONS)
     {
         MatrixMegolmOutSessionInit(
             &client->megolmOutSessions[client->numMegolmOutSessions],
             roomId);
-
-        *outSession = &client->megolmOutSessions[client->numMegolmOutSessions];
         
         client->numMegolmOutSessions++;
 
         return true;
     }
-
     return false;
 }
 

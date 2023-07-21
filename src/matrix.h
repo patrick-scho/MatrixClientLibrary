@@ -11,6 +11,7 @@
 
 
 #define USER_ID_SIZE 64
+#define ROOM_ID_SIZE 128
 #define SERVER_SIZE 20
 #define ACCESS_TOKEN_SIZE 40
 #define DEVICE_ID_SIZE 20
@@ -102,7 +103,7 @@ typedef struct MatrixMegolmInSession {
 } MatrixMegolmInSession;
 
 typedef struct MatrixMegolmOutSession {
-    const char * roomId;
+    char roomId[ROOM_ID_SIZE];
 
     OlmOutboundGroupSession * session;
     char memory[MEGOLM_OUTBOUND_SESSION_MEMORY_SIZE];
@@ -263,6 +264,11 @@ MatrixClientSetMegolmOutSession(
     MatrixClient * client,
     const char * roomId,
     MatrixMegolmOutSession session);
+
+bool
+MatrixClientInitMegolmOutSession(
+    MatrixClient * client,
+    const char * roomId);
 
 bool
 MatrixClientGetOlmSession(

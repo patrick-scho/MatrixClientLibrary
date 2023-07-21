@@ -160,28 +160,56 @@ ExecuteCommand(
             body);
     }
     else if (CheckCommand(cmd, "sharesession")) {
-        CHECK_ARGS(2, "<user_id> <device_id>")
+        CHECK_ARGS(3, "<session_index> <user_id> <device_id>")
 
-        MatrixClientShareMegolmOutSession(&client,
-            args[0],
+        int sessionIndex = atoi(args[0]);
+
+        MatrixClientShareMegolmOutSession(client,
             args[1],
-            &client->megolmOutSessions[0]);
+            args[2],
+            &client->megolmOutSessions[sessionIndex]);
     }
     else if (CheckCommand(cmd, "savesession")) {
-        CHECK_ARGS(2, "<filename> <key>")
+        CHECK_ARGS(3, "<session_index> <filename> <key>")
+
+        int sessionIndex = atoi(args[0]);
 
         MatrixMegolmOutSessionSave(
-            &client->megolmOutSessions[0],
-            args[0],
-            args[1]);
+            &client->megolmOutSessions[sessionIndex],
+            args[1],
+            args[2]);
     }
     else if (CheckCommand(cmd, "loadsession")) {
-        CHECK_ARGS(2, "<filename> <key>")
+        CHECK_ARGS(3, "<session_index> <filename> <key>")
+
+        int sessionIndex = atoi(args[0]);
 
         MatrixMegolmOutSessionLoad(
-            &client->megolmOutSessions[0],
-            args[0],
-            args[1]);
+            &client->megolmOutSessions[sessionIndex],
+            args[1],
+            args[2]);
+    }
+    else if (CheckCommand(cmd, "printsessions")) {
+        for (int i = 0; i < client->numMegolmOutSessions; i++) {
+            printf("%d: %s\t%s\t%s\n", i,
+                client->megolmOutSessions[i].roomId,
+                client->megolmOutSessions[i].id,
+                client->megolmOutSessions[i].key);
+        }
+    }
+    else if (CheckCommand(cmd, "initsession")) {
+        CHECK_ARGS(1, "<room_id>")
+
+        if (! MatrixClientInitMegolmOutSession(client,
+            args[0]))
+        {
+            printf("Maximum number of Megolm sessions reached (%d)\n", NUM_MEGOLM_SESSIONS);
+        }
+    }
+    
+    
+    else {
+        printf("Unknown command\n");
     }
 #undef CHECK_ARGS
 }
