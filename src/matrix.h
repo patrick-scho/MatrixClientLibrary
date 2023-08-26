@@ -56,6 +56,7 @@
 typedef struct MatrixDevice {
     char deviceId[DEVICE_ID_SIZE];
     char deviceKey[DEVICE_KEY_SIZE];
+    char signingKey[SIGNING_KEY_SIZE];
 } MatrixDevice;
 
 
@@ -70,16 +71,39 @@ bool
 MatrixOlmAccountInit(
     MatrixOlmAccount * account);
 
+bool
+MatrixOlmAccountUnpickle(
+    MatrixOlmAccount * account,
+    void * pickled, int pickledLen,
+    const void * key, int keyLen);
+
+bool
+MatrixOlmAccountGetDeviceKey(
+    MatrixOlmAccount * account,
+    char * key, int keyCap);
+    
+bool
+MatrixOlmAccountGetSigningKey(
+    MatrixOlmAccount * account,
+    char * key, int keyCap);
+
 
 // Matrix Olm Session
 
 typedef struct MatrixOlmSession {
-    const char * deviceId;
+    const char * deviceId; // TODO: char[]
 
     int type;
     OlmSession * session;
     char memory[OLM_SESSION_MEMORY_SIZE];
 } MatrixOlmSession;
+
+bool
+MatrixOlmSessionUnpickle(
+    MatrixOlmSession * session,
+    const char * deviceId,
+    void * pickled, int pickledLen,
+    const void * key, int keyLen);
 
 bool
 MatrixOlmSessionTo(
@@ -151,8 +175,8 @@ typedef struct MatrixClient {
     MatrixDevice devices[NUM_DEVICES];
     int numDevices;
     
-    char deviceKey[DEVICE_KEY_SIZE];
-    char signingKey[DEVICE_KEY_SIZE];
+    // char deviceKey[DEVICE_KEY_SIZE];
+    // char signingKey[DEVICE_KEY_SIZE];
 
     char userId[USER_ID_SIZE];
     char server[SERVER_SIZE];
@@ -204,7 +228,7 @@ MatrixClientUploadOnetimeKeys(
     MatrixClient * client);
 
 bool
-MatrixClientUploadDeviceKeys(
+MatrixClientUploadDeviceKey(
     MatrixClient * client);
 
 bool
@@ -250,6 +274,7 @@ MatrixClientShareMegolmOutSession(
 bool
 MatrixClientShareMegolmOutSessionTest(
     MatrixClient * client,
+    const char * userId,
     const char * deviceId,
     MatrixMegolmOutSession * session);
 
@@ -294,19 +319,23 @@ MatrixClientSendToDeviceEncrypted(
     const char * msgType);
 
 bool
-MatrixClientGetDeviceKey(
+MatrixClientRequestDeviceKey(
     MatrixClient * client,
     const char * deviceId,
     char * outDeviceKey, int outDeviceKeyCap);
-
+    
 bool
-MatrixClientGetDeviceKey(
+MatrixClientRequestSigningKey(
     MatrixClient * client,
     const char * deviceId,
-    char * outDeviceKey, int outDeviceKeyCap);
+    char * outSigningKey, int outSigningKeyCap);
 
 bool
 MatrixClientRequestDeviceKeys(
+    MatrixClient * client);
+
+bool
+MatrixClientDeleteDevice(
     MatrixClient * client);
 
 
@@ -357,7 +386,8 @@ JsonEscape(
     const char * sIn, int sInLen,
     char * sOut, int sOutCap);
     
-bool JsonSign(
+bool
+JsonSign(
     MatrixClient * client,
     const char * sIn, int sInLen,
     char * sOut, int sOutCap);

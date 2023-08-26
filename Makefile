@@ -1,4 +1,4 @@
-CC=clang
+CC=clang++
 
 C_OPTS=-Wall -Wextra -pedantic
 C_OPTS+=src/matrix.c
@@ -13,7 +13,7 @@ C_OPTS+=-l ws2_32
 C_OPTS+=-l ssl
 C_OPTS+=-l crypto
 C_OPTS+=-l stdc++
-C_OPTS+=out/olm/libolm.a
+C_OPTS+=out/olmdbg/libolm.a
 C_OPTS+=-D MG_ENABLE_OPENSSL=1
 C_OPTS+=-fuse-ld=lld.exe -g -gcodeview -Wl,/debug,/pdb:out/test.pdb
 # C_OPTS+=-I ext/curl/include/

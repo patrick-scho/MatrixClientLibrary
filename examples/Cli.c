@@ -5,8 +5,6 @@
 #include <matrix.h>
 
 #define SERVER       "https://matrix.org"
-#define ACCESS_TOKEN "syt_cHNjaG8_yBvTjVTquGCikvsAenOJ_49mBMO"
-#define DEVICE_ID    "MAZNCCZLBR"
 #define USER_ID      "@pscho:matrix.org"
 #define ROOM_ID      "!XKFUjAsGrSSrpDFIxB:matrix.org"
 
@@ -70,28 +68,58 @@ Usage(
     printf("Usage: %s %s\n", cmd, args);
 }
 
-void
+bool
 ExecuteCommand(
     MatrixClient * client,
     const char * cmd,
     int nargs, char ** args
 ) {
-#define CHECK_ARGS(N, ARGS) if (nargs != N) { Usage(cmd, ARGS); return; }
-    /**/ if (CheckCommand(cmd, "devicekey")) {
-        printf("%s\n", client->deviceKey);
+#define CHECK_ARGS(N, ARGS) if (nargs != N) { Usage(cmd, ARGS); return true; }
+
+    /**/ if (CheckCommand(cmd, "exit")) {
+        return false;
+    }
+    else if (CheckCommand(cmd, "devicekey")) {
+        static char key[DEVICE_KEY_SIZE];
+        if (MatrixOlmAccountGetDeviceKey(&client->olmAccount, key, DEVICE_KEY_SIZE))
+            printf("%s\n", key);
+    }
+    else if (CheckCommand(cmd, "accesstoken")) {
+        printf("%s\n", client->accessToken);
     }
     else if (CheckCommand(cmd, "genkeys")) {
         CHECK_ARGS(1, "<number of keys>")
 
         MatrixClientGenerateOnetimeKeys(client, atoi(args[0]));
     }
-    else if (CheckCommand(cmd, "uploadkeys")) {
+    else if (CheckCommand(cmd, "uploadonetimekeys")) {
         MatrixClientUploadOnetimeKeys(client);
+    }
+    else if (CheckCommand(cmd, "uploaddevicekey")) {
+        MatrixClientUploadDeviceKey(client);
     }
     else if (CheckCommand(cmd, "onetimekeys")) {
         static char buffer[1024];
         olm_account_one_time_keys(client->olmAccount.account, buffer, 1024);
         printf("%s\n", buffer);
+    }
+    else if (CheckCommand(cmd, "sendto")) {
+        CHECK_ARGS(3, "<device_id> <msgtype> <msg>")
+
+        MatrixClientSendToDevice(client,
+            USER_ID,
+            args[0],
+            args[2],
+            args[1]);
+    }
+    else if (CheckCommand(cmd, "sendtoe")) {
+        CHECK_ARGS(3, "<device_id> <msgtype> <msg>")
+
+        MatrixClientSendToDeviceEncrypted(client,
+            USER_ID,
+            args[0],
+            args[2],
+            args[1]);
     }
     else if (CheckCommand(cmd, "getkeys")) {
         MatrixClientRequestDeviceKeys(client);
@@ -115,6 +143,14 @@ ExecuteCommand(
             "  ", mjson_print_fixed_buf, &fb);
         printf("%.*s\n", fb.len, fb.ptr);
     }
+    else if (CheckCommand(cmd, "login")) {
+        CHECK_ARGS(3, "<username> <password> <displayname>")
+
+        MatrixClientLoginPassword(client,
+            args[0],
+            args[1],
+            args[2]);
+    }
     else if (CheckCommand(cmd, "save")) {
         CHECK_ARGS(1, "<filename>")
 
@@ -134,6 +170,19 @@ ExecuteCommand(
             args[1]);
 
         MatrixClientSendEvent(client,
+            args[0],
+            "m.room.message",
+            body);
+    }
+    else if (CheckCommand(cmd, "sendencrypted")) {
+        CHECK_ARGS(2, "<room_id> <message>")
+
+        static char body[1024];
+        snprintf(body, 1024,
+            "{\"body\":\"%s\",\"msgtype\":\"m.text\"}",
+            args[1]);
+
+        MatrixClientSendEventEncrypted(client,
             args[0],
             "m.room.message",
             body);
@@ -212,6 +261,8 @@ ExecuteCommand(
         printf("Unknown command\n");
     }
 #undef CHECK_ARGS
+
+    return true;
 }
 
 int
@@ -223,12 +274,13 @@ main(void)
     
     MatrixHttpInit(&client);
 
-    MatrixClientSetAccessToken(&client,
-        ACCESS_TOKEN);
-    MatrixClientSetDeviceId(&client,
-        DEVICE_ID);
-    MatrixClientSetUserId(&client,
-        USER_ID);
+
+    MatrixClientSetUserId(&client, USER_ID);
+    MatrixClientLoginPassword(&client, "@pscho:matrix.org", "Wc23EbmB9G3faMq", "abc");
+    MatrixClientGenerateOnetimeKeys(&client, 10);
+    MatrixClientUploadDeviceKey(&client);
+    MatrixClientUploadOnetimeKeys(&client);
+
 
     static char cmd[BUFFER_SIZE];
     static char args_[NUMBER_ARGS][BUFFER_SIZE];
@@ -236,13 +288,18 @@ main(void)
     for (int i = 0; i < NUMBER_ARGS; i++)
         args[i] = args_[i];
     int nargs;
-    do {
+    while (1) {
         GetCommand(cmd, &nargs, args);
 
-        ExecuteCommand(&client, cmd, nargs, args);
+        bool res =
+            ExecuteCommand(&client, cmd, nargs, args);
         
-    } while (strcmp(cmd, "exit") != 0);
-        
+        if (! res)
+            break;
+    }
+    
+    MatrixClientDeleteDevice(&client);
+
     MatrixHttpDeinit(&client);
 
     return 0;

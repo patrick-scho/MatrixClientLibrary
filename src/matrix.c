@@ -23,8 +23,8 @@
 #define KEYS_QUERY_RESPONSE_SIZE (1024*10)
 
 #define KEYS_UPLOAD_URL "/_matrix/client/v3/keys/upload"
-#define KEYS_UPLOAD_REQUEST_SIZE 1024
-#define KEYS_UPLOAD_REQUEST_SIGNED_SIZE 2048
+#define KEYS_UPLOAD_REQUEST_SIZE 1024*4
+#define KEYS_UPLOAD_REQUEST_SIGNED_SIZE 2048*4
 #define KEYS_UPLOAD_RESPONSE_SIZE 2048
 
 #define KEYS_CLAIM_URL "/_matrix/client/v3/keys/claim"
@@ -88,6 +88,9 @@ bool JsonSign(
             signature, OLM_SIGNATURE_SIZE);
     
     int signatureLen = res;
+    
+    char thisSigningKey[DEVICE_KEY_SIZE];
+    MatrixOlmAccountGetSigningKey(&client->olmAccount, thisSigningKey, DEVICE_KEY_SIZE);
 
     static char signatureJson[JSON_SIGNATURE_SIZE];
     int signatureJsonLen =
@@ -100,7 +103,7 @@ bool JsonSign(
                 "}"
             "}",
             client->userId,
-            client->deviceId,
+            "1",
             signatureLen, signature);
 
     struct mjson_fixedbuf result = { sOut, sOutCap, 0 };
@@ -131,7 +134,54 @@ MatrixOlmAccountInit(
     return res != olm_error();
 }
 
-// TODO: in/outbound sessions
+bool
+MatrixOlmAccountUnpickle(
+    MatrixOlmAccount * account,
+    void * pickled, int pickledLen,
+    const void * key, int keyLen)
+{
+    size_t res;
+    res = olm_unpickle_account(account->account,
+        key, keyLen,
+        pickled, pickledLen);
+    if (res == olm_error()) {
+        printf("error unpickling olm account:%s\n",
+            olm_account_last_error(account->account));
+    }
+    return res != olm_error();
+}
+
+bool
+MatrixOlmAccountGetDeviceKey(
+    MatrixOlmAccount * account,
+    char * key, int keyCap)
+{
+    static char deviceKeysJson[OLM_IDENTITY_KEYS_JSON_SIZE];
+    size_t res =
+        olm_account_identity_keys(account->account,
+            deviceKeysJson, OLM_IDENTITY_KEYS_JSON_SIZE);
+    mjson_get_string(deviceKeysJson, res,
+        "$.curve25519",
+        key, keyCap);
+    return true;
+}
+
+bool
+MatrixOlmAccountGetSigningKey(
+    MatrixOlmAccount * account,
+    char * key, int keyCap)
+{
+    static char deviceKeysJson[OLM_IDENTITY_KEYS_JSON_SIZE];
+    size_t res =
+        olm_account_identity_keys(account->account,
+            deviceKeysJson, OLM_IDENTITY_KEYS_JSON_SIZE);
+    mjson_get_string(deviceKeysJson, res,
+        "$.ed25519",
+        key, keyCap);
+    return true;
+}
+
+// TODO:in/outbound sessions
 bool
 MatrixOlmSessionTo(
     MatrixOlmSession * session,
@@ -158,10 +208,36 @@ MatrixOlmSessionTo(
             random, OLM_OUTBOUND_SESSION_RANDOM_SIZE);
     
     if (res == olm_error()) {
-        printf("error olm: %s\n", olm_account_last_error(olmAccount));
+        printf("error olm:%s\n", olm_session_last_error(session->session));
     }
 
     return session->session != NULL;
+}
+
+bool
+MatrixOlmSessionUnpickle(
+    MatrixOlmSession * session,
+    const char * deviceId,
+    void * pickled, int pickledLen,
+    const void * key, int keyLen)
+{
+    memset(session, 0, sizeof(MatrixOlmSession));
+
+    session->deviceId = deviceId;
+
+    session->session =
+        olm_session(session->memory);
+    
+    size_t res;
+    res = olm_unpickle_session(session->session,
+        key, keyLen,
+        pickled, pickledLen);
+    
+    if (res == olm_error()) {
+        printf("error unpickling olm session:%s\n", olm_session_last_error(session->session));
+    }
+
+    return res != olm_error();
 }
 
 bool
@@ -306,21 +382,6 @@ MatrixClientInit(
     // init olm account
     MatrixOlmAccountInit(&client->olmAccount);
 
-    // set device key
-    static char deviceKeysJson[OLM_IDENTITY_KEYS_JSON_SIZE];
-    size_t res =
-        olm_account_identity_keys(
-            client->olmAccount.account,
-            deviceKeysJson,
-            OLM_IDENTITY_KEYS_JSON_SIZE);
-
-    mjson_get_string(deviceKeysJson, res,
-        "$.curve25519",
-        client->deviceKey, DEVICE_KEY_SIZE);
-    mjson_get_string(deviceKeysJson, res,
-        "$.ed25519",
-        client->signingKey, SIGNING_KEY_SIZE);
-
     return true;
 }
 
@@ -331,8 +392,15 @@ MatrixClientSave(
 {
     FILE * f = fopen(filename, "w");
     
-    fwrite(client->deviceKey, 1, DEVICE_KEY_SIZE, f);
-    fwrite(client->signingKey, 1, DEVICE_KEY_SIZE, f);
+    
+    char thisDeviceKey[DEVICE_KEY_SIZE];
+    MatrixOlmAccountGetDeviceKey(&client->olmAccount, thisDeviceKey, DEVICE_KEY_SIZE);
+    char thisSigningKey[DEVICE_KEY_SIZE];
+    MatrixOlmAccountGetSigningKey(&client->olmAccount, thisSigningKey, DEVICE_KEY_SIZE);
+
+
+    fwrite(thisDeviceKey, 1, DEVICE_KEY_SIZE, f);
+    fwrite(thisSigningKey, 1, DEVICE_KEY_SIZE, f);
     fwrite(client->userId, 1, USER_ID_SIZE, f);
     fwrite(client->server, 1, SERVER_SIZE, f);
     fwrite(client->accessToken, 1, ACCESS_TOKEN_SIZE, f);
@@ -357,8 +425,15 @@ MatrixClientLoad(
 {
     FILE * f = fopen(filename, "r");
     
-    fread(client->deviceKey, 1, DEVICE_KEY_SIZE, f);
-    fread(client->signingKey, 1, DEVICE_KEY_SIZE, f);
+    
+    char thisDeviceKey[DEVICE_KEY_SIZE];
+    MatrixOlmAccountGetDeviceKey(&client->olmAccount, thisDeviceKey, DEVICE_KEY_SIZE);
+    char thisSigningKey[DEVICE_KEY_SIZE];
+    MatrixOlmAccountGetSigningKey(&client->olmAccount, thisSigningKey, DEVICE_KEY_SIZE);
+
+
+    fread(thisDeviceKey, 1, DEVICE_KEY_SIZE, f);
+    fread(thisSigningKey, 1, DEVICE_KEY_SIZE, f);
     fread(client->userId, 1, USER_ID_SIZE, f);
     fread(client->server, 1, SERVER_SIZE, f);
     fread(client->accessToken, 1, ACCESS_TOKEN_SIZE, f);
@@ -480,9 +555,14 @@ MatrixClientUploadOnetimeKeys(
 
 // https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3keysupload
 bool
-MatrixClientUploadDeviceKeys(
+MatrixClientUploadDeviceKey(
     MatrixClient * client)
 {
+    char thisDeviceKey[DEVICE_KEY_SIZE];
+    MatrixOlmAccountGetDeviceKey(&client->olmAccount, thisDeviceKey, DEVICE_KEY_SIZE);
+    char thisSigningKey[DEVICE_KEY_SIZE];
+    MatrixOlmAccountGetSigningKey(&client->olmAccount, thisSigningKey, DEVICE_KEY_SIZE);
+
     static char deviceKeysBuffer[KEYS_UPLOAD_REQUEST_SIZE];
 
     mjson_snprintf(deviceKeysBuffer, KEYS_UPLOAD_REQUEST_SIZE,
@@ -496,8 +576,8 @@ MatrixClientUploadDeviceKeys(
             "\"user_id\":\"%s\""
         "}}",
         client->deviceId,
-        client->deviceId, client->deviceKey,
-        client->deviceId, client->signingKey,
+        client->deviceId, thisDeviceKey,
+        client->deviceId, thisSigningKey,
         client->userId);
 
     static char deviceKeysSignedBuffer[KEYS_UPLOAD_REQUEST_SIGNED_SIZE];
@@ -527,12 +607,12 @@ MatrixClientClaimOnetimeKey(
     static char requestBuffer[KEYS_CLAIM_REQUEST_SIZE];
     mjson_snprintf(requestBuffer, KEYS_CLAIM_REQUEST_SIZE,
     "{"
-      "\"one_time_keys\": {"
-        "\"%s\": {"
-          "\"%s\": \"signed_curve25519\""
+      "\"one_time_keys\":{"
+        "\"%s\":{"
+          "\"%s\":\"signed_curve25519\""
         "}"
       "},"
-      "\"timeout\": 10000"
+      "\"timeout\":10000"
     "}",
     userId,
     deviceId);
@@ -567,7 +647,7 @@ MatrixClientClaimOnetimeKey(
     mjson_get_string(keyObject + voff, vlen,
         "$.key", outOnetimeKey, outOnetimeKeyCap);
     
-    // TODO: verify signature
+    // TODO:verify signature
     
     return true;
 }
@@ -584,13 +664,13 @@ MatrixClientLoginPassword(
 
     mjson_snprintf(requestBuffer, LOGIN_REQUEST_SIZE,
         "{"
-            "\"type\": \"m.login.password\","
-            "\"identifier\": {"
-                "\"type\": \"m.id.user\","
-                "\"user\": \"%s\""
+            "\"type\":\"m.login.password\","
+            "\"identifier\":{"
+                "\"type\":\"m.id.user\","
+                "\"user\":\"%s\""
             "},"
-            "\"password\": \"%s\","
-            "\"initial_device_display_name\": \"%s\""
+            "\"password\":\"%s\","
+            "\"initial_device_display_name\":\"%s\""
         "}",
         username,
         password,
@@ -604,10 +684,10 @@ MatrixClientLoginPassword(
             responseBuffer, LOGIN_RESPONSE_SIZE,
             false);
     
-    int responseLen = strlen(responseBuffer);
-    
     if (!result)
         return false;
+    
+    int responseLen = strlen(responseBuffer);
 
     mjson_get_string(responseBuffer, responseLen,
         "$.access_token",
@@ -679,8 +759,12 @@ MatrixClientSendEventEncrypted(
         requestBuffer,
         encryptedBuffer, ENCRYPTED_REQUEST_SIZE);
 
+    char thisDeviceKey[DEVICE_KEY_SIZE];
+    MatrixOlmAccountGetDeviceKey(&client->olmAccount, thisDeviceKey, DEVICE_KEY_SIZE);
+    
+
     // encrypted event json
-    const char * senderKey = client->deviceKey;
+    const char * senderKey = thisDeviceKey;
     const char * sessionId = outSession->id;
     const char * deviceId = client->deviceId;
 
@@ -762,6 +846,7 @@ MatrixClientShareMegolmOutSession(
 bool
 MatrixClientShareMegolmOutSessionTest(
     MatrixClient * client,
+    const char * userId,
     const char * deviceId,
     MatrixMegolmOutSession * session)
 {
@@ -781,7 +866,7 @@ MatrixClientShareMegolmOutSessionTest(
 
     // send
     MatrixClientSendToDevice(client,
-        client->userId,
+        userId,
         deviceId,
         eventBuffer,
         "m.room_key");
@@ -866,7 +951,7 @@ MatrixClientGetOlmSession(
     if (client->numOlmSessions < NUM_OLM_SESSIONS)
     {
         static char deviceKey[DEVICE_KEY_SIZE];
-        MatrixClientGetDeviceKey(client,
+        MatrixClientRequestDeviceKey(client,
             deviceId,
             deviceKey, DEVICE_KEY_SIZE);
 
@@ -909,8 +994,8 @@ MatrixClientSendToDevice(
     static char eventBuffer[TODEVICE_EVENT_SIZE];
     snprintf(eventBuffer, TODEVICE_EVENT_SIZE,
         "{"
-            "\"messages\": {"
-                "\"%s\": {"
+            "\"messages\":{"
+                "\"%s\":{"
                     "\"%s\":%s"
                 "}"
             "}"
@@ -943,35 +1028,46 @@ MatrixClientSendToDeviceEncrypted(
     MatrixClientGetOlmSession(client, userId, deviceId, &olmSession);
 
     // create event json
-    char deviceKey[DEVICE_KEY_SIZE];
-    MatrixClientGetDeviceKey(client, deviceId, deviceKey, DEVICE_KEY_SIZE);
+    char targetDeviceKey[DEVICE_KEY_SIZE];
+    MatrixClientRequestDeviceKey(client, deviceId, targetDeviceKey, DEVICE_KEY_SIZE);
+    char targetSigningKey[SIGNING_KEY_SIZE];
+    MatrixClientRequestSigningKey(client, deviceId, targetSigningKey, SIGNING_KEY_SIZE);
     
+    char thisSigningKey[DEVICE_KEY_SIZE];
+    MatrixOlmAccountGetSigningKey(&client->olmAccount, thisSigningKey, DEVICE_KEY_SIZE);
+
     static char eventBuffer[TODEVICE_EVENT_SIZE];
     sprintf(eventBuffer,
         "{"
-        "\"type\": \"%s\","
-        "\"content\": \"%s\","
-        "\"sender\": \"%s\","
-        "\"recipient\": \"%s\","
-        "\"recipient_keys\": {"
-          "\"ed25519\": \"%s\""
+        "\"type\":\"%s\","
+        "\"content\":%s,"
+        "\"sender\":\"%s\","
+        "\"recipient\":\"%s\","
+        "\"recipient_keys\":{"
+          "\"ed25519\":\"%s\""
         "},"
-        "\"keys\": {"
-          "\"ed25519\": \"%s\""
+        "\"keys\":{"
+          "\"ed25519\":\"%s\""
         "}"
         "}",
         msgType,
         message,
         client->userId,
         userId, // recipient user id
-        deviceKey, // recipient device key
-        client->deviceKey);
+        targetSigningKey, // recipient device key
+        thisSigningKey);
+    
+    printf("%s\n", eventBuffer);
 
     // encrypt
     static char encryptedBuffer[ENCRYPTED_REQUEST_SIZE];
     MatrixOlmSessionEncrypt(olmSession,
         eventBuffer,
         encryptedBuffer, ENCRYPTED_REQUEST_SIZE);
+
+    char thisDeviceKey[DEVICE_KEY_SIZE];
+    MatrixOlmAccountGetDeviceKey(&client->olmAccount, thisDeviceKey, DEVICE_KEY_SIZE);
+
 
     static char encryptedEventBuffer[ENCRYPTED_EVENT_SIZE];
     sprintf(encryptedEventBuffer,
@@ -986,11 +1082,11 @@ MatrixClientSendToDeviceEncrypted(
         "\"device_id\":\"%s\","
         "\"sender_key\":\"%s\""
         "}",
-        deviceKey,
+        targetDeviceKey,
         encryptedBuffer,
-        0, //olmSession->type,
+        olm_session_has_received_message(olmSession->session),
         client->deviceId,
-        client->deviceKey);
+        thisDeviceKey);
 
     // send
     return MatrixClientSendToDevice(
@@ -1023,7 +1119,7 @@ MatrixClientFindDevice(
 }
 
 bool
-MatrixClientGetDeviceKey(
+MatrixClientRequestDeviceKey(
     MatrixClient * client,
     const char * deviceId,
     char * outDeviceKey, int outDeviceKeyCap)
@@ -1041,6 +1137,31 @@ MatrixClientGetDeviceKey(
     if (MatrixClientFindDevice(client, deviceId, &device))
     {
         strncpy(outDeviceKey, device->deviceKey, outDeviceKeyCap);
+        return true;
+    }
+
+    return false;
+}
+
+bool
+MatrixClientRequestSigningKey(
+    MatrixClient * client,
+    const char * deviceId,
+    char * outSigningKey, int outSigningKeyCap)
+{
+    MatrixDevice * device;
+    
+    if (MatrixClientFindDevice(client, deviceId, &device))
+    {
+        strncpy(outSigningKey, device->signingKey, outSigningKeyCap);
+        return true;
+    }
+
+    MatrixClientRequestDeviceKeys(client);
+    
+    if (MatrixClientFindDevice(client, deviceId, &device))
+    {
+        strncpy(outSigningKey, device->signingKey, outSigningKeyCap);
         return true;
     }
 
@@ -1079,7 +1200,7 @@ MatrixClientRequestDeviceKeys(
     int slen;
     mjson_find(responseBuffer, strlen(responseBuffer),
         query, &s, &slen);
-
+    
     // loop over keys
     
     int koff, klen, voff, vlen, vtype, off = 0;
@@ -1100,11 +1221,26 @@ MatrixClientRequestDeviceKeys(
         mjson_get_string(val, vlen,
             deviceKeyQuery, d.deviceKey, DEVICE_KEY_SIZE);
 
+        // look for signing key in value
+        static char signingKeyQuery[JSON_QUERY_SIZE];
+        snprintf(signingKeyQuery, JSON_QUERY_SIZE,
+            "$.keys.ed25519:%s", d.deviceId);
+        mjson_get_string(val, vlen,
+            signingKeyQuery, d.signingKey, SIGNING_KEY_SIZE);
+
         // add device
         if (client->numDevices < NUM_DEVICES)
         {
-            client->devices[client->numDevices] = d;
-            client->numDevices++;
+            bool foundDevice = false;
+            for (int i = 0; i < client->numDevices; i++)
+                if (strcmp(client->devices[i].deviceId, d.deviceId) == 0)
+                    foundDevice = true;
+
+            if (! foundDevice) {
+                printf("new device: %s %s %s\n", d.deviceId, d.deviceKey, d.signingKey);
+                client->devices[client->numDevices] = d;
+                client->numDevices++;
+            }
         }
         else
         {
@@ -1113,4 +1249,18 @@ MatrixClientRequestDeviceKeys(
     }
 
     return true;
+}
+
+bool
+MatrixClientDeleteDevice(
+    MatrixClient * client)
+{
+    static char deleteRequest[1024];
+    snprintf(deleteRequest, 1024,
+        "{\"devices\":[\"%s\"]}",
+        client->deviceId);
+    static char deleteResponse[1024];
+    bool res = MatrixHttpPost(client, "/_matrix/client/v3/delete_devices",
+        deleteRequest, deleteResponse, 1024, true);
+    return res;
 }

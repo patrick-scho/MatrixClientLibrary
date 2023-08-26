@@ -5,14 +5,14 @@
 - automate script to generate header with size defines
 
 # Matrix Lib
-- manage keys
-- upload keys
++ manage keys
++ upload keys
 - create olm session
   - incoming
-  - outgoing
-- store keys/sessions
+  + outgoing
++ store keys/sessions
 - respond to events
   - room_key_request
-- add client saving/loading
-- esp compatibility
++ add client saving/loading
++ esp compatibility
 - http requests in chunks/dynamically allocated
