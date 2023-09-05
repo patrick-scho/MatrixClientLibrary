@@ -18,3 +18,4 @@
 - overhaul client saving/loading
 + esp compatibility
 - http requests in chunks/dynamically allocated
+- URL encode (sync next_batch)

@@ -842,11 +842,34 @@ MatrixClientSendEventEncrypted(
 bool
 MatrixClientSync(
     MatrixClient * client,
-    char * outSyncBuffer, int outSyncCap)
+    char * outSyncBuffer, int outSyncCap,
+    const char * nextBatch)
 {
+    // filter={\"event_fields\":[\"to_device\"]}
+    static char url[MAX_URL_LEN];
+    snprintf(url, MAX_URL_LEN,
+        "/_matrix/client/v3/sync%s",
+        strlen(nextBatch) > 0 ? "?since=" : "");
+    
+    int index = strlen(url);
+
+    for (int i = 0; i < strlen(nextBatch); i++) {
+        char c = nextBatch[i];
+
+        if (c == '~') {
+            url[index++] = '%';
+            url[index++] = '7';
+            url[index++] = 'E';
+        }
+        else {
+            url[index++] = c;
+        }
+    }
+    url[index] = '\0';
+
     return
         MatrixHttpGet(client,
-            "/_matrix/client/v3/sync",
+            url,
             outSyncBuffer, outSyncCap,
             true);
 }

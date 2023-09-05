@@ -44,6 +44,10 @@ MatrixHttpCallback(
         conn->connection = c;
         conn->connected = true;
     }
+    if (ev == MG_EV_HTTP_CHUNK)
+    {
+        
+    }
     if (ev == MG_EV_HTTP_MSG)
     {
         // Response

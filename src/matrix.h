@@ -17,7 +17,7 @@
 #define DEVICE_ID_SIZE 20
 #define EXPIRE_MS_SIZE 20
 #define REFRESH_TOKEN_SIZE 20
-#define MAX_URL_LEN 128
+#define MAX_URL_LEN 1024
 
 #define OLM_IDENTITY_KEYS_JSON_SIZE 128
 #define DEVICE_KEY_SIZE 44
@@ -275,7 +275,8 @@ MatrixClientSendEventEncrypted(
 bool
 MatrixClientSync(
     MatrixClient * client,
-    char * outSync, int outSyncCap);
+    char * outSync, int outSyncCap,
+    const char * nextBatch);
 
 bool
 MatrixClientGetRoomEvent(
