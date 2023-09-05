@@ -119,12 +119,25 @@ MatrixOlmSessionEncrypt(
     const char * plaintext,
     char * outBuffer, int outBufferCap);
 
+bool
+MatrixOlmSessionDecrypt(
+    MatrixOlmSession * session,
+    size_t messageType,
+    char * encrypted,
+    char * outBuffer, int outBufferCap);
+
 
 // Matrix Megolm Session
 
 typedef struct MatrixMegolmInSession {
     OlmInboundGroupSession * session;
 } MatrixMegolmInSession;
+
+bool
+MatrixMegolmInSessionDecrypt(
+    MatrixMegolmInSession * megolmInSession,
+    const char * encrypted,
+    char * outDecrypted, int outDecryptedCap);
 
 typedef struct MatrixMegolmOutSession {
     char roomId[ROOM_ID_SIZE];
@@ -265,6 +278,13 @@ MatrixClientSync(
     char * outSync, int outSyncCap);
 
 bool
+MatrixClientGetRoomEvent(
+    MatrixClient * client,
+    const char * roomId,
+    const char * eventId,
+    char * outEvent, int outEventCap);
+
+bool
 MatrixClientShareMegolmOutSession(
     MatrixClient * client,
     const char * userId,
@@ -294,6 +314,16 @@ bool
 MatrixClientInitMegolmOutSession(
     MatrixClient * client,
     const char * roomId);
+    
+bool
+MatrixClientRequestMegolmInSession(
+    MatrixClient * client,
+    const char * roomId,
+    const char * sessionId,
+    const char * senderKey,
+    const char * userId,
+    const char * deviceId, // TODO: remove deviceId (query all devices)
+    MatrixMegolmInSession * outMegolmInSession);
 
 bool
 MatrixClientGetOlmSession(
@@ -317,6 +347,12 @@ MatrixClientSendToDeviceEncrypted(
     const char * deviceId,
     const char * message,
     const char * msgType);
+
+bool
+MatrixClientSendDummy(
+    MatrixClient * client,
+    const char * userId,
+    const char * deviceId);
 
 bool
 MatrixClientRequestDeviceKey(

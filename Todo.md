@@ -3,16 +3,18 @@
 + add esp build
 - (write script to build dependencies)
 - automate script to generate header with size defines
+- run on esp
 
 # Matrix Lib
 + manage keys
 + upload keys
-- create olm session
-  - incoming
++ create olm session
+  + incoming
   + outgoing
 + store keys/sessions
 - respond to events
   - room_key_request
 + add client saving/loading
+- overhaul client saving/loading
 + esp compatibility
 - http requests in chunks/dynamically allocated

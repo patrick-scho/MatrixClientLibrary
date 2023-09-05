@@ -17,9 +17,8 @@
 #include <esp_wifi.h>
 
 #define SERVER       "https://matrix.org"
-#define ACCESS_TOKEN "syt_cHNjaG8_yBvTjVTquGCikvsAenOJ_49mBMO"
-#define DEVICE_ID    "MAZNCCZLBR"
-#define ROOM_ID      "!koVStwyiiKcBVbXZYz:matrix.org"
+#define USER_ID      "@pscho:matrix.org"
+#define ROOM_ID      "!XKFUjAsGrSSrpDFIxB:matrix.org"
 
 void
 app_main(void)
@@ -28,18 +27,37 @@ app_main(void)
     MatrixClientInit(&client,
         SERVER);
     
-    void wifi_init(const char *ssid, const char *pass);
-    wifi_init("Hundehuette", "Affensicherespw55");
-
     MatrixHttpInit(&client);
 
-    MatrixClientSetAccessToken(&client,
-        ACCESS_TOKEN);
+    MatrixClientSetUserId(&client, USER_ID);
 
-    MatrixClientSendEvent(&client,
+    MatrixClientLoginPassword(&client,
+        "pscho",
+        "Wc23EbmB9G3faMq",
+        "Test1");
+
+    MatrixClientUploadDeviceKey(&client);
+    MatrixClientGenerateOnetimeKeys(&client, 10);
+    MatrixClientUploadOnetimeKeys(&client);
+
+    // create megolmsession
+    MatrixMegolmOutSession * megolmOutSession;
+    MatrixClientGetMegolmOutSession(&client,
+        ROOM_ID,
+        &megolmOutSession);
+    printf("megolm session id: %.10s... key: %.10s...\n", megolmOutSession->id, megolmOutSession->key);
+
+    MatrixClientShareMegolmOutSession(&client,
+        USER_ID,
+        "ULZZOKJBYN",
+        megolmOutSession);
+
+    MatrixClientSendEventEncrypted(&client,
         ROOM_ID,
         "m.room.message",
         "{\"body\":\"Hello\",\"msgtype\":\"m.text\"}");
         
+    MatrixClientDeleteDevice(&client);
+
     MatrixHttpDeinit(&client);
 }
