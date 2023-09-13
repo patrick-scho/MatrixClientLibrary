@@ -49,7 +49,7 @@
 
 #define NUM_MEGOLM_SESSIONS 10
 #define NUM_OLM_SESSIONS 10
-#define NUM_DEVICES 10
+#define NUM_DEVICES 100
 
 // Matrix Device
 
@@ -106,6 +106,14 @@ MatrixOlmSessionUnpickle(
     const void * key, int keyLen);
 
 bool
+MatrixOlmSessionFrom(
+    MatrixOlmSession * session,
+    OlmAccount * olmAccount,
+    const char * deviceId,
+    const char * deviceKey,
+    const char * encrypted);
+
+bool
 MatrixOlmSessionTo(
     MatrixOlmSession * session,
     OlmAccount * olmAccount,
@@ -130,23 +138,35 @@ MatrixOlmSessionDecrypt(
 // Matrix Megolm Session
 
 typedef struct MatrixMegolmInSession {
+    char roomId[ROOM_ID_SIZE];
+    char id[MEGOLM_SESSION_ID_SIZE];
+    char key[MEGOLM_SESSION_KEY_SIZE];
+
     OlmInboundGroupSession * session;
+    char memory[MEGOLM_OUTBOUND_SESSION_MEMORY_SIZE];
+
 } MatrixMegolmInSession;
 
 bool
+MatrixMegolmInSessionInit(
+    MatrixMegolmInSession * session,
+    const char * roomId,
+    const char * sessionId,
+    const char * sessionKey, int sessionKeyLen);
+
+bool
 MatrixMegolmInSessionDecrypt(
-    MatrixMegolmInSession * megolmInSession,
-    const char * encrypted,
+    MatrixMegolmInSession * session,
+    const char * encrypted, int encryptedLen,
     char * outDecrypted, int outDecryptedCap);
 
 typedef struct MatrixMegolmOutSession {
     char roomId[ROOM_ID_SIZE];
+    char id[MEGOLM_SESSION_ID_SIZE];
+    char key[MEGOLM_SESSION_KEY_SIZE];
 
     OlmOutboundGroupSession * session;
     char memory[MEGOLM_OUTBOUND_SESSION_MEMORY_SIZE];
-
-    char id[MEGOLM_SESSION_ID_SIZE];
-    char key[MEGOLM_SESSION_KEY_SIZE];
 } MatrixMegolmOutSession;
 
 bool
@@ -306,15 +326,25 @@ MatrixClientGetMegolmOutSession(
     MatrixMegolmOutSession ** outSession);
 
 bool
-MatrixClientSetMegolmOutSession(
+MatrixClientNewMegolmOutSession(
     MatrixClient * client,
     const char * roomId,
-    MatrixMegolmOutSession session);
+    MatrixMegolmOutSession ** outSession);
 
 bool
-MatrixClientInitMegolmOutSession(
+MatrixClientGetMegolmInSession(
     MatrixClient * client,
-    const char * roomId);
+    const char * roomId, int roomIdLen,
+    const char * sessionId, int sessionIdLen,
+    MatrixMegolmInSession ** outSession);
+
+bool
+MatrixClientNewMegolmInSession(
+    MatrixClient * client,
+    const char * roomId,
+    const char * sessionId,
+    const char * sessionKey,
+    MatrixMegolmInSession ** outSession);
     
 bool
 MatrixClientRequestMegolmInSession(
@@ -323,11 +353,18 @@ MatrixClientRequestMegolmInSession(
     const char * sessionId,
     const char * senderKey,
     const char * userId,
-    const char * deviceId, // TODO: remove deviceId (query all devices)
-    MatrixMegolmInSession * outMegolmInSession);
+    const char * deviceId); // TODO: remove deviceId (query all devices)
 
 bool
-MatrixClientGetOlmSession(
+MatrixClientGetOlmSessionIn(
+    MatrixClient * client,
+    const char * userId,
+    const char * deviceId,
+    const char * encrypted,
+    MatrixOlmSession ** outSession);
+    
+bool
+MatrixClientGetOlmSessionOut(
     MatrixClient * client,
     const char * userId,
     const char * deviceId,
@@ -420,6 +457,11 @@ Randomize(uint8_t * random, int randomLen);
 
 bool
 JsonEscape(
+    const char * sIn, int sInLen,
+    char * sOut, int sOutCap);
+    
+bool
+JsonCanonicalize(
     const char * sIn, int sInLen,
     char * sOut, int sOutCap);
     

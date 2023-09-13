@@ -53,10 +53,10 @@ main(void)
     printf("event: %s\n", eventBuffer);
 
     // verify
-    char theirDeviceKey[DEVICE_KEY_SIZE];
-    MatrixClientRequestDeviceKey(&client,
-        DEVICE_ID,
-        theirDeviceKey, DEVICE_KEY_SIZE);
+    // char theirDeviceKey[DEVICE_KEY_SIZE];
+    // MatrixClientRequestDeviceKey(&client,
+    //     DEVICE_ID,
+    //     theirDeviceKey, DEVICE_KEY_SIZE);
     
     char transactionId[256];
     GetLine(transactionId, 128);

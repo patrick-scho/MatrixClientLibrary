@@ -33,9 +33,14 @@
 #define KEYS_CLAIM_REQUEST_SIZE 1024
 #define KEYS_CLAIM_RESPONSE_SIZE 1024
 
+#define SYNC_TIMEOUT 5000
+
 #define JSON_QUERY_SIZE 128
+#define JSON_MAX_INDICES 100
+#define JSON_MAX_ENTRY_SIZE 1024
 
-
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
 
 void
 Randomize(
@@ -74,6 +79,69 @@ JsonEscape(
 
     if (sOutIndex < sOutCap)
         sOut[sOutIndex] = '\0';
+
+    return true;
+}
+
+bool
+JsonCanonicalize(
+    const char * sIn, int sInLen,
+    char * sOut, int sOutCap)
+{
+    snprintf(sOut, sOutCap, "{}");
+
+    int koff, klen, voff, vlen, vtype, off;
+
+    struct Key {
+        const char * ptr;
+        int len;
+    };
+
+    struct Key keys[JSON_MAX_INDICES];
+    int numKeys = 0;
+
+    for (off = 0; (off = mjson_next(sIn, sInLen, off, &koff, &klen, &voff, &vlen, &vtype)) != 0; ) {
+        keys[numKeys].ptr = sIn + koff;
+        keys[numKeys].len = klen;
+        numKeys++;
+    }
+
+    for (int i = 0; i < numKeys; i++) {
+        for (int j = i; j < numKeys; j++) {
+            if (
+                strncmp(
+                    keys[i].ptr,
+                    keys[j].ptr,
+                    MIN(keys[i].len, keys[j].len)
+                ) > 0
+            ) {
+                struct Key k = keys[i];
+                keys[i] = keys[j];
+                keys[j] = k;
+            }
+        }
+    }
+
+    for (int i = 0; i < numKeys; i++) {
+        char jp[JSON_QUERY_SIZE];
+        snprintf(jp, JSON_QUERY_SIZE, "$.%.*s", keys[i].len-2, keys[i].ptr+1);
+
+        const char * valPtr;
+        int valLen;
+        mjson_find(sIn, sInLen, jp, &valPtr, &valLen);
+        
+        static char newEntry[JSON_MAX_ENTRY_SIZE];
+        snprintf(newEntry, JSON_MAX_ENTRY_SIZE, "{%.*s:%.*s}", keys[i].len, keys[i].ptr, valLen, valPtr);
+
+        char * buffer = strdup(sOut);
+
+        struct mjson_fixedbuf fb = { sOut, sOutCap, 0 };
+        mjson_merge(buffer, strlen(buffer), newEntry, strlen(newEntry), mjson_print_fixed_buf, &fb);
+
+        free(buffer);
+    }
+
+    // TODO: recursively sort entries
 
     return true;
 }
@@ -184,7 +252,35 @@ MatrixOlmAccountGetSigningKey(
     return true;
 }
 
-// TODO:in/outbound sessions
+bool
+MatrixOlmSessionFrom(
+    MatrixOlmSession * session,
+    OlmAccount * olmAccount,
+    const char * deviceId,
+    const char * deviceKey,
+    const char * encrypted)
+{
+    memset(session, 0, sizeof(MatrixOlmSession));
+
+    session->deviceId = deviceId;
+
+    session->session =
+        olm_session(session->memory);
+    
+    char * encryptedCopy = strdup(encrypted);
+
+    size_t res =
+        olm_create_inbound_session_from(session->session, olmAccount,
+            deviceKey, strlen(deviceKey),
+            encryptedCopy, strlen(encryptedCopy));
+    
+    if (res == olm_error()) {
+        printf("error olm:%s\n", olm_session_last_error(session->session));
+    }
+
+    return res != olm_error();
+}
+
 bool
 MatrixOlmSessionTo(
     MatrixOlmSession * session,
@@ -214,7 +310,7 @@ MatrixOlmSessionTo(
         printf("error olm:%s\n", olm_session_last_error(session->session));
     }
 
-    return session->session != NULL;
+    return res != olm_error();
 }
 
 bool
@@ -277,9 +373,66 @@ MatrixOlmSessionDecrypt(
             outBuffer, outBufferCap);
     
     if (res != olm_error() && res < outBufferCap)
-        outBuffer[outBufferCap] = '\0';
+        outBuffer[res] = '\0';
 
     return res != olm_error();
+}
+
+bool
+MatrixMegolmInSessionInit(
+    MatrixMegolmInSession * session,
+    const char * roomId,
+    const char * sessionId,
+    const char * sessionKey, int sessionKeyLen)
+{
+    memset(session, 0, sizeof(MatrixMegolmInSession));
+    
+    strncpy(session->roomId, roomId, sizeof(session->roomId));
+    strncpy(session->id, sessionId, sizeof(session->id));
+    strncpy(session->key, sessionKey, sizeof(session->key));
+
+    session->session =
+        olm_inbound_group_session(session->memory);
+
+    size_t res =
+        olm_init_inbound_group_session(
+        // olm_import_inbound_group_session(
+            session->session,
+            (const uint8_t *)sessionKey, sessionKeyLen);
+    if (res == olm_error()) {
+        printf("Error initializing Megolm session: %s\n", olm_inbound_group_session_last_error(session->session));
+    }
+
+    return res != olm_error();
+}
+
+bool
+MatrixMegolmInSessionDecrypt(
+    MatrixMegolmInSession * session,
+    const char * encrypted, int encryptedLen,
+    char * outDecrypted, int outDecryptedCap)
+{
+    // uint8_t buffer[1024];
+    // memcpy(buffer, encrypted, encryptedLen);
+
+    uint32_t megolmInMessageIndex;
+
+    size_t res =
+        olm_group_decrypt(session->session,
+            (uint8_t *)encrypted, encryptedLen,
+            (uint8_t *)outDecrypted, outDecryptedCap,
+            &megolmInMessageIndex);
+    
+    printf("message index: %d\n", megolmInMessageIndex);
+    
+    if (res == olm_error()) {
+        printf("error decrypting megolm message: %s\n", olm_inbound_group_session_last_error(session->session));
+    }
+    else {
+        printf("decrypted len: %d\n", res);
+    }
+    
+    return true;
 }
 
 // https://matrix.org/docs/guides/end-to-end-encryption-implementation-guide#starting-a-megolm-session
@@ -591,8 +744,6 @@ MatrixClientUploadOnetimeKeys(
         responseBuffer, KEYS_UPLOAD_RESPONSE_SIZE,
         true);
 
-    printf("%s\n", responseBuffer);
-
     return true;
 }
 
@@ -639,8 +790,6 @@ MatrixClientUploadDeviceKey(
         finalEvent,
         responseBuffer, KEYS_UPLOAD_RESPONSE_SIZE,
         true);
-        
-    printf("%s\n", responseBuffer);
 
     return true;
 }
@@ -800,7 +949,8 @@ MatrixClientSendEventEncrypted(
 
     // get megolm session
     MatrixMegolmOutSession * outSession;
-    MatrixClientGetMegolmOutSession(client, roomId, &outSession);
+    if (! MatrixClientGetMegolmOutSession(client, roomId, &outSession))
+        MatrixClientNewMegolmOutSession(client, roomId, &outSession);
         
     // encrypt
     static char encryptedBuffer[ENCRYPTED_REQUEST_SIZE];
@@ -848,12 +998,13 @@ MatrixClientSync(
     // filter={\"event_fields\":[\"to_device\"]}
     static char url[MAX_URL_LEN];
     snprintf(url, MAX_URL_LEN,
-        "/_matrix/client/v3/sync%s",
-        strlen(nextBatch) > 0 ? "?since=" : "");
+        "/_matrix/client/v3/sync?timeout=%d%s",
+        SYNC_TIMEOUT,
+        strlen(nextBatch) > 0 ? "&since=" : "");
     
     int index = strlen(url);
 
-    for (int i = 0; i < strlen(nextBatch); i++) {
+    for (size_t i = 0; i < strlen(nextBatch); i++) {
         char c = nextBatch[i];
 
         if (c == '~') {
@@ -916,16 +1067,6 @@ MatrixClientShareMegolmOutSession(
         session->key
     );
 
-    // // get olm session
-    // MatrixOlmSession * olmSession;
-    // MatrixClientGetOlmSession(client, userId, deviceId, &olmSession);
-
-    // // encrypt
-    // char encryptedBuffer[KEY_SHARE_EVENT_LEN];
-    // MatrixOlmSessionEncrypt(olmSession,
-    //     eventBuffer,
-    //     encryptedBuffer, KEY_SHARE_EVENT_LEN);
-
     // send
     MatrixClientSendToDeviceEncrypted(client,
         userId,
@@ -967,23 +1108,6 @@ MatrixClientShareMegolmOutSessionTest(
     return true;
 }
 
-// bool
-// MatrixClientSetMegolmOutSession(
-//     MatrixClient * client,
-//     const char * roomId,
-//     MatrixMegolmOutSession session)
-// {
-//     if (client->numMegolmOutSessions < 10)
-//     {
-//         session.roomId = roomId;
-//         client->megolmOutSessions[client->numMegolmOutSessions] = session;
-//         client->numMegolmOutSessions++;
-
-//         return true;
-//     }
-//     return false;
-// }
-
 bool
 MatrixClientGetMegolmOutSession(
     MatrixClient * client,
@@ -999,8 +1123,27 @@ MatrixClientGetMegolmOutSession(
         }
     }
 
-    if (MatrixClientInitMegolmOutSession(client, roomId)) {
-        *outSession = &client->megolmOutSessions[client->numMegolmOutSessions-1];
+    return false;
+}
+
+bool
+MatrixClientNewMegolmOutSession(
+    MatrixClient * client,
+    const char * roomId,
+    MatrixMegolmOutSession ** outSession)
+{
+    if (client->numMegolmOutSessions < NUM_MEGOLM_SESSIONS)
+    {
+        MatrixMegolmOutSession * result =
+            &client->megolmOutSessions[client->numMegolmOutSessions];
+        
+        MatrixMegolmOutSessionInit(result,
+            roomId);
+
+        *outSession = result;
+
+        client->numMegolmOutSessions++;
+
         return true;
     }
 
@@ -1008,20 +1151,50 @@ MatrixClientGetMegolmOutSession(
 }
 
 bool
-MatrixClientInitMegolmOutSession(
+MatrixClientGetMegolmInSession(
     MatrixClient * client,
-    const char * roomId)
+    const char * roomId, int roomIdLen,
+    const char * sessionId, int sessionIdLen,
+    MatrixMegolmInSession ** outSession)
 {
-    if (client->numMegolmOutSessions < NUM_MEGOLM_SESSIONS)
+    for (int i = 0; i < client->numMegolmInSessions; i++)
     {
-        MatrixMegolmOutSessionInit(
-            &client->megolmOutSessions[client->numMegolmOutSessions],
-            roomId);
+        if (strncmp(client->megolmInSessions[i].roomId, roomId, roomIdLen) == 0 &&
+            strncmp(client->megolmInSessions[i].id, sessionId, sessionIdLen) == 0)
+        {
+            *outSession = &client->megolmInSessions[i];
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool
+MatrixClientNewMegolmInSession(
+    MatrixClient * client,
+    const char * roomId,
+    const char * sessionId,
+    const char * sessionKey,
+    MatrixMegolmInSession ** outSession)
+{
+    if (client->numMegolmInSessions < NUM_MEGOLM_SESSIONS)
+    {
+        MatrixMegolmInSession * result =
+            &client->megolmInSessions[client->numMegolmInSessions];
         
-        client->numMegolmOutSessions++;
+        MatrixMegolmInSessionInit(result,
+            roomId,
+            sessionId,
+            sessionKey, strlen(sessionKey));
+        
+        *outSession = result;
+
+        client->numMegolmInSessions++;
 
         return true;
     }
+
     return false;
 }
 
@@ -1032,8 +1205,7 @@ MatrixClientRequestMegolmInSession(
     const char * sessionId,
     const char * senderKey,
     const char * userId,
-    const char * deviceId,
-    MatrixMegolmInSession * outMegolmInSession)
+    const char * deviceId)
 {
     // TODO: cancel requests
     MatrixClientSendDummy(client, userId, deviceId);
@@ -1068,7 +1240,48 @@ MatrixClientRequestMegolmInSession(
 }
 
 bool
-MatrixClientGetOlmSession(
+MatrixClientGetOlmSessionIn(
+    MatrixClient * client,
+    const char * userId,
+    const char * deviceId,
+    const char * encrypted,
+    MatrixOlmSession ** outSession)
+{
+    for (int i = 0; i < client->numOlmSessions; i++)
+    {
+        if (strcmp(client->olmSessions[i].deviceId, deviceId) == 0)
+        {
+            *outSession = &client->olmSessions[i];
+            return true;
+        }
+    }
+
+    if (client->numOlmSessions < NUM_OLM_SESSIONS)
+    {
+        static char deviceKey[DEVICE_KEY_SIZE];
+        MatrixClientRequestDeviceKey(client,
+            deviceId,
+            deviceKey, DEVICE_KEY_SIZE);
+
+        MatrixOlmSessionFrom(
+            &client->olmSessions[client->numOlmSessions],
+            client->olmAccount.account,
+            deviceId,
+            deviceKey,
+            encrypted);
+
+        *outSession = &client->olmSessions[client->numOlmSessions];
+        
+        client->numOlmSessions++;
+
+        return true;
+    }
+
+    return false;
+}
+
+bool
+MatrixClientGetOlmSessionOut(
     MatrixClient * client,
     const char * userId,
     const char * deviceId,
@@ -1162,7 +1375,7 @@ MatrixClientSendToDeviceEncrypted(
 {
     // get olm session
     MatrixOlmSession * olmSession;
-    MatrixClientGetOlmSession(client, userId, deviceId, &olmSession);
+    MatrixClientGetOlmSessionOut(client, userId, deviceId, &olmSession);
 
     // create event json
     char targetDeviceKey[DEVICE_KEY_SIZE];
@@ -1193,8 +1406,6 @@ MatrixClientSendToDeviceEncrypted(
         userId, // recipient user id
         targetSigningKey, // recipient device key
         thisSigningKey);
-    
-    printf("%s\n", eventBuffer);
 
     // encrypt
     static char encryptedBuffer[ENCRYPTED_REQUEST_SIZE];
@@ -1341,8 +1552,6 @@ MatrixClientRequestDeviceKeys(
 
     if (! requestResult)
         return false;
-
-    printf("keys:\n%s\n", responseBuffer);
 
     // query for retrieving device keys for user id
     static char query[JSON_QUERY_SIZE];
