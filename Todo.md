@@ -12,8 +12,8 @@
   + incoming
   + outgoing
 + store keys/sessions
-- respond to events
-  - room_key_request
++ respond to events
+  + room_key_request
 + add client saving/loading
 - overhaul client saving/loading
 + esp compatibility

@@ -49,7 +49,54 @@
 
 #define NUM_MEGOLM_SESSIONS 10
 #define NUM_OLM_SESSIONS 10
-#define NUM_DEVICES 100
+#define NUM_DEVICES 10
+
+// HTTP
+
+typedef struct MatrixHttpConnection MatrixHttpConnection;
+
+bool
+MatrixHttpInit(
+    MatrixHttpConnection ** hc,
+    const char * host);
+
+// bool
+// MatrixHttpConnect(
+//     MatrixHttpConnection * hc);
+
+bool
+MatrixHttpDeinit(
+    MatrixHttpConnection ** hc);
+    
+bool
+MatrixHttpSetAccessToken(
+    MatrixHttpConnection * hc,
+    const char * accessToken);
+
+bool
+MatrixHttpGet(
+    MatrixHttpConnection * hc,
+    const char * url,
+    char * outResponseBuffer, int outResponseCap,
+    bool authenticated);
+
+bool
+MatrixHttpPost(
+    MatrixHttpConnection * hc,
+    const char * url,
+    const char * requestBuffer,
+    char * outResponseBuffer, int outResponseCap,
+    bool authenticated);
+
+bool
+MatrixHttpPut(
+    MatrixHttpConnection * hc,
+    const char * url,
+    const char * requestBuffer,
+    char * outResponseBuffer, int outResponseCap,
+    bool authenticated);
+
+
 
 // Matrix Device
 
@@ -212,19 +259,17 @@ typedef struct MatrixClient {
     // char signingKey[DEVICE_KEY_SIZE];
 
     char userId[USER_ID_SIZE];
-    char server[SERVER_SIZE];
     char accessToken[ACCESS_TOKEN_SIZE];
     char deviceId[DEVICE_ID_SIZE];
     char expireMs[EXPIRE_MS_SIZE];
     char refreshToken[REFRESH_TOKEN_SIZE];
 
-    void * httpUserData;
+    MatrixHttpConnection * hc;
 } MatrixClient;
 
 bool
 MatrixClientInit(
-    MatrixClient * client,
-    const char * server);
+    MatrixClient * client);
 
 bool
 MatrixClientSave(
@@ -360,11 +405,25 @@ MatrixClientGetOlmSessionIn(
     MatrixClient * client,
     const char * userId,
     const char * deviceId,
+    MatrixOlmSession ** outSession);
+
+bool
+MatrixClientNewOlmSessionIn(
+    MatrixClient * client,
+    const char * userId,
+    const char * deviceId,
     const char * encrypted,
     MatrixOlmSession ** outSession);
     
 bool
 MatrixClientGetOlmSessionOut(
+    MatrixClient * client,
+    const char * userId,
+    const char * deviceId,
+    MatrixOlmSession ** outSession);
+    
+bool
+MatrixClientNewOlmSessionOut(
     MatrixClient * client,
     const char * userId,
     const char * deviceId,
@@ -412,43 +471,6 @@ bool
 MatrixClientDeleteDevice(
     MatrixClient * client);
 
-
-
-
-bool
-MatrixHttpInit(
-    MatrixClient * client);
-
-bool
-MatrixHttpConnect(
-    MatrixClient * client);
-
-bool
-MatrixHttpDeinit(
-    MatrixClient * client);
-
-bool
-MatrixHttpGet(
-    MatrixClient * client,
-    const char * url,
-    char * outResponseBuffer, int outResponseCap,
-    bool authenticated);
-
-bool
-MatrixHttpPost(
-    MatrixClient * client,
-    const char * url,
-    const char * requestBuffer,
-    char * outResponseBuffer, int outResponseCap,
-    bool authenticated);
-
-bool
-MatrixHttpPut(
-    MatrixClient * client,
-    const char * url,
-    const char * requestBuffer,
-    char * outResponseBuffer, int outResponseCap,
-    bool authenticated);
 
 // util
 

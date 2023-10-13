@@ -34,7 +34,7 @@ main(void)
 
     // create megolmsession
     MatrixMegolmOutSession * megolmOutSession;
-    MatrixClientGetMegolmOutSession(&client,
+    MatrixClientNewMegolmOutSession(&client,
         ROOM_ID,
         &megolmOutSession);
     printf("megolm session id: %.10s... key: %.10s...\n", megolmOutSession->id, megolmOutSession->key);

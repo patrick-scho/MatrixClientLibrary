@@ -1,4 +1,9 @@
-// Code taken from the ESP32 IDF WiFi station Example
+/*
+ * SPDX-FileCopyrightText: 2010-2022 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: CC0-1.0
+ */
+
 
 #include <string.h>
 #include "esp_event.h"
@@ -12,8 +17,6 @@
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
-
-#include "mongoose.h"
 
 static EventGroupHandle_t s_wifi_event_group;
 
@@ -35,14 +38,14 @@ static void event_handler(void *arg, esp_event_base_t event_base,
     if (s_retry_num < 3) {
       esp_wifi_connect();
       s_retry_num++;
-      MG_INFO(("retry to connect to the AP"));
+      printf("retry to connect to the AP\n");
     } else {
       xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
     }
-    MG_ERROR(("connect to the AP fail"));
+    printf("connect to the AP fail\n");
   } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
     ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
-    MG_INFO(("IP ADDRESS:" IPSTR, IP2STR(&event->ip_info.ip)));
+    printf("IP ADDRESS:" IPSTR "\n", IP2STR(&event->ip_info.ip));
     s_retry_num = 0;
     xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
   }
@@ -81,18 +84,18 @@ void wifi_init(const char *ssid, const char *pass) {
   ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
   ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &c));
   ESP_ERROR_CHECK(esp_wifi_start());
-  MG_DEBUG(("wifi_init_sta finished."));
+  printf("wifi_init_sta finished.\n");
 
   EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
                                          WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
                                          pdFALSE, pdFALSE, portMAX_DELAY);
 
   if (bits & WIFI_CONNECTED_BIT) {
-    MG_INFO(("connected to ap SSID:%s password:%s", ssid, pass));
+    printf("connected to ap SSID:%s password:%s\n", ssid, pass);
   } else if (bits & WIFI_FAIL_BIT) {
-    MG_ERROR(("Failed to connect to SSID:%s, password:%s", ssid, pass));
+    printf("Failed to connect to SSID:%s, password:%s\n", ssid, pass);
   } else {
-    MG_ERROR(("UNEXPECTED EVENT"));
+    printf("UNEXPECTED EVENT\n");
   }
 
   /* The event will not be processed after unregister */
