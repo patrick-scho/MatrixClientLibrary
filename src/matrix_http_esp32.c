@@ -98,6 +98,7 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
             copy_len = MIN(evt->data_len, (hc->dataCap - hc->dataLen));
             if (copy_len) {
                 memcpy(hc->data + hc->dataLen, evt->data, copy_len);
+                hc->data[hc->dataLen + copy_len] = '\0';
             }
 
             hc->dataLen += copy_len;

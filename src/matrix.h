@@ -47,9 +47,9 @@
 #define JSON_ONETIME_KEY_SIGNED_SIZE 256
 #define JSON_SIGNATURE_SIZE 256
 
-#define NUM_MEGOLM_SESSIONS 10
-#define NUM_OLM_SESSIONS 10
-#define NUM_DEVICES 10
+#define NUM_MEGOLM_SESSIONS 2
+#define NUM_OLM_SESSIONS 2
+#define NUM_DEVICES 5
 
 // HTTP
 
@@ -401,7 +401,7 @@ MatrixClientRequestMegolmInSession(
     const char * deviceId); // TODO: remove deviceId (query all devices)
 
 bool
-MatrixClientGetOlmSessionIn(
+MatrixClientGetOlmSession(
     MatrixClient * client,
     const char * userId,
     const char * deviceId,
@@ -413,13 +413,6 @@ MatrixClientNewOlmSessionIn(
     const char * userId,
     const char * deviceId,
     const char * encrypted,
-    MatrixOlmSession ** outSession);
-    
-bool
-MatrixClientGetOlmSessionOut(
-    MatrixClient * client,
-    const char * userId,
-    const char * deviceId,
     MatrixOlmSession ** outSession);
     
 bool

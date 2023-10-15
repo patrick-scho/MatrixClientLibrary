@@ -62,9 +62,9 @@ HandleEvent(
         OlmUtility * olmUtil = olm_utility(malloc(olm_utility_size()));
         
         STATIC char publicKey[64];
-        STATIC char keyStartJsonCanonical[128];
-        STATIC char concat[128+64];
-        STATIC char commitment[256];
+        STATIC char keyStartJsonCanonical[512];
+        STATIC char concat[512+64];
+        STATIC char commitment[1024];
         olm_sas_get_pubkey(olmSas,
             publicKey,
             64);
@@ -73,15 +73,15 @@ HandleEvent(
         const char * keyStartJson;
         int keyStartJsonLen;
         mjson_find(event, eventLen, "$.content", &keyStartJson, &keyStartJsonLen);
-        JsonCanonicalize(keyStartJson, keyStartJsonLen, keyStartJsonCanonical, 128);
+        JsonCanonicalize(keyStartJson, keyStartJsonLen, keyStartJsonCanonical, 512);
 
         printf("json:\n%.*s\ncanonical json:\n%s\n", keyStartJsonLen, keyStartJson, keyStartJsonCanonical);
 
         int concatLen =
-            snprintf(concat, 128+64, "%.*s%s", olm_sas_pubkey_length(olmSas), publicKey, keyStartJsonCanonical);
+            snprintf(concat, 512+64, "%.*s%s", olm_sas_pubkey_length(olmSas), publicKey, keyStartJsonCanonical);
 
         int commitmentLen =
-            olm_sha256(olmUtil, concat, concatLen, commitment, 256);
+            olm_sha256(olmUtil, concat, concatLen, commitment, 1024);
         
         STATIC char verificationAcceptBuffer[512];
         snprintf(verificationAcceptBuffer, 512,
@@ -293,16 +293,22 @@ HandleEvent(
             mjson_get_string(event, eventLen, jp, encrypted, 2048);
 
             MatrixOlmSession * olmSession;
-            if (messageTypeInt == 0) {
-                MatrixClientGetOlmSessionIn(client,
-                    USER_ID,
-                    DEVICE_ID,
-                    &olmSession);
-            } else {
-                MatrixClientGetOlmSessionOut(client,
-                    USER_ID,
-                    DEVICE_ID,
-                    &olmSession);
+            
+            if (! MatrixClientGetOlmSession(client, USER_ID, DEVICE_ID, &olmSession))
+            {
+                if (messageTypeInt == 0) {
+                    MatrixClientNewOlmSessionIn(client,
+                        USER_ID,
+                        DEVICE_ID,
+                        encrypted,
+                        &olmSession);
+                }
+                else {
+                    MatrixClientNewOlmSessionOut(client,
+                        USER_ID,
+                        DEVICE_ID,
+                        &olmSession);
+                }
             }
 
             printf("event: %.*s\n", eventLen, event);
@@ -380,16 +386,18 @@ HandleRoomEvent(
 void
 Sync(
     MatrixClient * client,
-    char * syncBuffer
-) {
+    char * syncBuffer, int syncBufferLen)
+{
     STATIC char nextBatch[1024] = {0};
 
-    MatrixClientSync(client, syncBuffer, 1024, nextBatch);
+    MatrixClientSync(client, syncBuffer, syncBufferLen, nextBatch);
     
     int res;
 
     const char * s = syncBuffer;
     int slen = strlen(syncBuffer);
+    
+    printf("sync:\n\n%s\n\n", syncBuffer);
     
     // {
     // int koff, klen, voff, vlen, vtype, off = 0;
@@ -465,9 +473,15 @@ Sync(
 int
 main(void)
 {
-    STATIC MatrixClient _client;
-    MatrixClient * client = &_client;
-    // MatrixClient * client = (MatrixClient*)malloc(sizeof(MatrixClient));
+    // sizeof(MatrixOlmAccount);
+    // sizeof(MatrixMegolmInSession);
+    // sizeof(MatrixMegolmOutSession);
+    // sizeof(MatrixOlmSession);    
+    // sizeof(MatrixDevice);
+
+    // STATIC MatrixClient _client;
+    // MatrixClient * client = &_client;
+    MatrixClient * client = (MatrixClient*)malloc(sizeof(MatrixClient));
     MatrixClientInit(client);
 
     MatrixHttpInit(&client->hc, SERVER);
@@ -488,40 +502,48 @@ main(void)
         EVENT_ID,
         eventBuffer, 1024);
     printf("event: %s\n", eventBuffer);
+
+    #define SYNC_BUFFER_SIZE 1024*10
+
+    // char * syncBuffer = (char*)malloc(SYNC_BUFFER_SIZE);
+    STATIC char syncBuffer[SYNC_BUFFER_SIZE];
+
+    while (! verified) {
+        Sync(client, syncBuffer, SYNC_BUFFER_SIZE);
+    }
+
+    printf("verified!\n");
     
-    char * syncBuffer = (char*)malloc(1024*40);
-    // STATIC char syncBuffer[1024];
-
-    while (! verified)
-        Sync(client, syncBuffer);
+    int c;
+    while ((c=getchar()) != 'q') {
+        printf("getchar() = %c [%d]\n", c, c);
+        Sync(client, syncBuffer, SYNC_BUFFER_SIZE);
+    }
     
-    // while (getchar() != 'q')
-    //     Sync(client, syncBuffer);
+    // MatrixClientRequestMegolmInSession(client,
+    //     ROOM_ID,
+    //     SESSION_ID,
+    //     SENDER_KEY,
+    //     USER_ID,
+    //     DEVICE_ID);
+
+    // MatrixMegolmInSession * megolmInSession;
+    // while (! MatrixClientGetMegolmInSession(client,
+    //     ROOM_ID, strlen(ROOM_ID),
+    //     SESSION_ID, strlen(SESSION_ID),
+    //     &megolmInSession))
+    //     Sync(client, syncBuffer, SYNC_BUFFER_SIZE);
+
+    // int encryptedLen =
+    //     mjson_get_string(eventBuffer, strlen(eventBuffer), "$.content.ciphertext", encrypted, 1024);
     
-    MatrixClientRequestMegolmInSession(client,
-        ROOM_ID,
-        SESSION_ID,
-        SENDER_KEY,
-        USER_ID,
-        DEVICE_ID);
+    // printf("encrypted: [%.*s]\n", encryptedLen, encrypted);
 
-    MatrixMegolmInSession * megolmInSession;
-    while (! MatrixClientGetMegolmInSession(client,
-        ROOM_ID, strlen(ROOM_ID),
-        SESSION_ID, strlen(SESSION_ID),
-        &megolmInSession))
-        Sync(client, syncBuffer);
+    // MatrixMegolmInSessionDecrypt(megolmInSession,
+    //     encrypted, encryptedLen,
+    //     decrypted, 1024);
 
-    int encryptedLen =
-        mjson_get_string(eventBuffer, strlen(eventBuffer), "$.content.ciphertext", encrypted, 1024);
-    
-    printf("encrypted: [%.*s]\n", encryptedLen, encrypted);
-
-    MatrixMegolmInSessionDecrypt(megolmInSession,
-        encrypted, encryptedLen,
-        decrypted, 1024);
-
-    printf("decrypted: %s\n", decrypted);
+    // printf("decrypted: %s\n", decrypted);
 
     MatrixClientDeleteDevice(client);
         
