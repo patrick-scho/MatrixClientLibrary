@@ -34,5 +34,4 @@ add_definitions(-DOLMLIB_VERSION_MINOR=2)
 add_definitions(-DOLMLIB_VERSION_PATCH=15)
 
 SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fpermissive -Wl,--allow-multiple-definition")
-SET(CMAKE_CXX_COMPILER  "C:/Espressif/tools/xtensa-esp32-elf/esp-12.2.0_20230208/xtensa-esp32-elf/bin/xtensa-esp32-elf-gcc.exe")
 
