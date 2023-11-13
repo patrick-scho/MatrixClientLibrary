@@ -24,13 +24,6 @@ main(void)
     MatrixClientGenerateOnetimeKeys(&client, 10);
     MatrixClientUploadOnetimeKeys(&client);
 
-    // // get device key
-    // static char deviceKey[128];
-    // MatrixClientGetDeviceKey(&client,
-    //     "ULZZOKJBYN",
-    //     deviceKey, 128);
-    // printf("device key for %s: %s\n", "ULZZOKJBYN", deviceKey);
-
     // create megolmsession
     MatrixMegolmOutSession * megolmOutSession;
     MatrixClientNewMegolmOutSession(&client,
@@ -38,22 +31,10 @@ main(void)
         &megolmOutSession);
     printf("megolm session id: %.10s... key: %.10s...\n", megolmOutSession->id, megolmOutSession->key);
 
-    // // create olmsession
-    // MatrixOlmSession * olmSession;
-    // MatrixClientGetOlmSession(&client,
-    //     USER_ID,
-    //     "ULZZOKJBYN",
-    //     &olmSession);
-    // printf("olm session created\n");
-
     MatrixClientShareMegolmOutSession(&client,
         USER_ID,
         "ULZZOKJBYN",
         megolmOutSession);
-    // MatrixClientShareMegolmOutSessionTest(&client,
-    //     USER_ID,
-    //     "ULZZOKJBYN",
-    //     megolmOutSession);
 
     MatrixClientSendEventEncrypted(&client,
         ROOM_ID,

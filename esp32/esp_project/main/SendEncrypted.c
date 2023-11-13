@@ -14,57 +14,42 @@
 int
 main(void)
 {
-    // static MatrixClient _client;
-    // MatrixClient * client = &_client;
-    MatrixClient * client = (MatrixClient*)malloc(sizeof(MatrixClient));
-    MatrixClientInit(client);
+    MatrixClient client;
+    MatrixClientInit(&client);
+    
+    MatrixHttpInit(&client.hc, SERVER);
 
-    MatrixHttpInit(&client->hc, SERVER);
-    MatrixClientSetUserId(client, USER_ID);
+    MatrixClientSetUserId(&client, USER_ID);
 
-    static char key[1024];
-    MatrixOlmAccountGetDeviceKey(&client->olmAccount, key, 1024);
-    printf("key: %s\n", key);
-
-    //MatrixClientSetUserId(client, USER_ID);
-
-    MatrixClientLoginPassword(client,
+    MatrixClientLoginPassword(&client,
         "pscho",
         "Wc23EbmB9G3faMq",
         "Test1");
 
-    // MatrixClientSendEvent(client,
-    //     ROOM_ID,
-    //     "m.room.message",
-    //     "{\"body\":\"Hello\",\"msgtype\":\"m.text\"}");
-
-    MatrixClientUploadDeviceKey(client);
-    MatrixClientGenerateOnetimeKeys(client, 10);
-    MatrixClientUploadOnetimeKeys(client);
+    MatrixClientUploadDeviceKeys(&client);
+    MatrixClientGenerateOnetimeKeys(&client, 10);
+    MatrixClientUploadOnetimeKeys(&client);
 
     // create megolmsession
     MatrixMegolmOutSession * megolmOutSession;
-    MatrixClientNewMegolmOutSession(client,
+    MatrixClientNewMegolmOutSession(&client,
         ROOM_ID,
         &megolmOutSession);
     printf("megolm session id: %.10s... key: %.10s...\n", megolmOutSession->id, megolmOutSession->key);
 
-    // heap_caps_get_free_size();
-    // xPortGetFreeHeapSize();
-
-    MatrixClientShareMegolmOutSession(client,
+    MatrixClientShareMegolmOutSession(&client,
         USER_ID,
         "ULZZOKJBYN",
         megolmOutSession);
 
-    MatrixClientSendEventEncrypted(client,
+    MatrixClientSendEventEncrypted(&client,
         ROOM_ID,
         "m.room.message",
         "{\"body\":\"Hello\",\"msgtype\":\"m.text\"}");
-        
-    MatrixClientDeleteDevice(client);
+    
+    MatrixClientDeleteDevice(&client);
 
-    MatrixHttpDeinit(&client->hc);
+    MatrixHttpDeinit(&client.hc);
 
     return 0;
 }
