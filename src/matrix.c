@@ -3,6 +3,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <mjson.h>
+#include <olm/sas.h>
 
 #ifdef ESP_PLATFORM
 #include <esp_random.h>
@@ -369,6 +370,7 @@ MatrixOlmSessionEncrypt(
     STATIC uint8_t random[OLM_ENCRYPT_RANDOM_SIZE];
     Randomize(random, OLM_ENCRYPT_RANDOM_SIZE);
 
+    memset(outBuffer, 0, outBufferCap);
     size_t res = olm_encrypt(session->session,
         plaintext, strlen(plaintext),
         random, OLM_ENCRYPT_RANDOM_SIZE,
@@ -393,7 +395,7 @@ MatrixOlmSessionDecrypt(
             encrypted, strlen(encrypted),
             outBuffer, outBufferCap);
     
-    if (res != olm_error() && res < outBufferCap)
+    if (res != olm_error() && (int)res < outBufferCap)
         outBuffer[res] = '\0';
 
     return res != olm_error();
@@ -494,79 +496,13 @@ MatrixMegolmOutSessionEncrypt(
     const char * plaintext,
     char * outBuffer, int outBufferCap)
 {
+    memset(outBuffer, 0, outBufferCap);
     size_t res = olm_group_encrypt(session->session,
         (uint8_t *)plaintext, strlen(plaintext),
         (uint8_t *)outBuffer, outBufferCap);
 
     return res != olm_error();
 }
-
-bool
-MatrixMegolmOutSessionSave(
-    MatrixMegolmOutSession * session,
-    const char * filename,
-    const char * key)
-{
-    FILE * f = fopen(filename, "w");
-
-    size_t roomIdLen = strlen(session->roomId);
-    fwrite(&roomIdLen, sizeof(size_t), 1, f);
-    fwrite(session->roomId, 1, roomIdLen, f);
-
-    size_t pickleBufferLen =
-        olm_pickle_outbound_group_session_length(
-            session->session);
-    void * pickleBuffer = malloc(pickleBufferLen);
-
-    olm_pickle_outbound_group_session(
-        session->session,
-        key, strlen(key),
-        pickleBuffer, pickleBufferLen);
-    
-    fwrite(&pickleBufferLen, sizeof(size_t), 1, f);
-    fwrite(pickleBuffer, 1, pickleBufferLen, f);
-    free(pickleBuffer);
-
-    fclose(f);
-
-    return true;
-}
-
-bool
-MatrixMegolmOutSessionLoad(
-    MatrixMegolmOutSession * session,
-    const char * filename,
-    const char * key)
-{
-    FILE * f = fopen(filename, "r");
-
-    size_t roomIdLen;
-    fread(&roomIdLen, sizeof(size_t), 1, f);
-    fread(session->roomId, 1, roomIdLen, f);
-    for (int i = roomIdLen; i < ROOM_ID_SIZE; i++)
-        session->roomId[i] = '\0';
-
-    size_t pickleBufferLen;
-    fread(&pickleBufferLen, sizeof(size_t), 1, f);
-
-    void * pickleBuffer = malloc(pickleBufferLen);
-    fread(pickleBuffer, 1, pickleBufferLen, f);
-
-    olm_unpickle_outbound_group_session(
-        session->session,
-        key, strlen(key),
-        pickleBuffer, pickleBufferLen);
-    
-    free(pickleBuffer);
-
-    olm_outbound_group_session_id(session->session, (uint8_t *)session->id, MEGOLM_SESSION_ID_SIZE);
-    olm_outbound_group_session_key(session->session, (uint8_t *)session->key, MEGOLM_SESSION_KEY_SIZE);
-
-    fclose(f);
-
-    return true;
-}
-
 
 
 bool
@@ -578,70 +514,6 @@ MatrixClientInit(
     // init olm account
     MatrixOlmAccountInit(&client->olmAccount);
 
-    return true;
-}
-
-bool
-MatrixClientSave(
-    MatrixClient * client,
-    const char * filename)
-{
-    FILE * f = fopen(filename, "w");
-    
-    
-    char thisDeviceKey[DEVICE_KEY_SIZE];
-    MatrixOlmAccountGetDeviceKey(&client->olmAccount, thisDeviceKey, DEVICE_KEY_SIZE);
-    char thisSigningKey[DEVICE_KEY_SIZE];
-    MatrixOlmAccountGetSigningKey(&client->olmAccount, thisSigningKey, DEVICE_KEY_SIZE);
-
-
-    fwrite(thisDeviceKey, 1, DEVICE_KEY_SIZE, f);
-    fwrite(thisSigningKey, 1, DEVICE_KEY_SIZE, f);
-    fwrite(client->userId, 1, USER_ID_SIZE, f);
-    fwrite(client->accessToken, 1, ACCESS_TOKEN_SIZE, f);
-    fwrite(client->deviceId, 1, DEVICE_ID_SIZE, f);
-    fwrite(client->expireMs, 1, EXPIRE_MS_SIZE, f);
-    fwrite(client->refreshToken, 1, REFRESH_TOKEN_SIZE, f);
-
-    fwrite(&client->numDevices, sizeof(int), 1, f);
-    for (int i = 0; i < client->numDevices; i++) {
-        fwrite(client->devices[i].deviceId, 1, DEVICE_ID_SIZE, f);
-        fwrite(client->devices[i].deviceKey, 1, DEVICE_KEY_SIZE, f);
-    }
-
-    fclose(f);
-    return true;
-}
-
-bool
-MatrixClientLoad(
-    MatrixClient * client,
-    const char * filename)
-{
-    FILE * f = fopen(filename, "r");
-    
-    
-    char thisDeviceKey[DEVICE_KEY_SIZE];
-    MatrixOlmAccountGetDeviceKey(&client->olmAccount, thisDeviceKey, DEVICE_KEY_SIZE);
-    char thisSigningKey[DEVICE_KEY_SIZE];
-    MatrixOlmAccountGetSigningKey(&client->olmAccount, thisSigningKey, DEVICE_KEY_SIZE);
-
-
-    fread(thisDeviceKey, 1, DEVICE_KEY_SIZE, f);
-    fread(thisSigningKey, 1, DEVICE_KEY_SIZE, f);
-    fread(client->userId, 1, USER_ID_SIZE, f);
-    fread(client->accessToken, 1, ACCESS_TOKEN_SIZE, f);
-    fread(client->deviceId, 1, DEVICE_ID_SIZE, f);
-    fread(client->expireMs, 1, EXPIRE_MS_SIZE, f);
-    fread(client->refreshToken, 1, REFRESH_TOKEN_SIZE, f);
-
-    fread(&client->numDevices, sizeof(int), 1, f);
-    for (int i = 0; i < client->numDevices; i++) {
-        fread(client->devices[i].deviceId, 1, DEVICE_ID_SIZE, f);
-        fread(client->devices[i].deviceKey, 1, DEVICE_KEY_SIZE, f);
-    }
-
-    fclose(f);
     return true;
 }
 
@@ -762,7 +634,7 @@ MatrixClientUploadOnetimeKeys(
 
 // https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3keysupload
 bool
-MatrixClientUploadDeviceKey(
+MatrixClientUploadDeviceKeys(
     MatrixClient * client)
 {
     char thisDeviceKey[DEVICE_KEY_SIZE];
@@ -998,12 +870,447 @@ MatrixClientSendEventEncrypted(
         g_EncryptedEventBuffer);
 }
 
+void
+MatrixClientHandleEvent(
+    MatrixClient * client,
+    const char * event, int eventLen
+) {
+    STATIC char eventType[128];
+    memset(eventType, 0, sizeof(eventType));
+    mjson_get_string(event, eventLen, "$.type", eventType, 128);
+
+    static char transactionId[64];
+    static char verifyFromDeviceId[DEVICE_ID_SIZE];
+    static OlmSAS * olmSas = NULL;
+
+    if (strcmp(eventType, "m.key.verification.request") == 0) {
+        memset(transactionId, 0, 64);
+        if (olmSas != NULL)
+            free(olmSas);
+        
+        mjson_get_string(event, eventLen, "$.content.transaction_id", transactionId, 64);
+        mjson_get_string(event, eventLen, "$.content.from_device", verifyFromDeviceId, DEVICE_ID_SIZE);
+        
+        char verificationReadyBuffer[2048];
+        snprintf(verificationReadyBuffer, 2048,
+            "{"
+            "\"from_device\":\"%s\","
+            "\"methods\":[\"m.sas.v1\"],"
+            "\"transaction_id\":\"%s\""
+            "}",
+            client->deviceId,
+            transactionId);
+        
+        MatrixClientSendToDevice(client,
+            client->userId,
+            verifyFromDeviceId,
+            verificationReadyBuffer,
+            "m.key.verification.ready");
+    }
+    else if (strcmp(eventType, "m.key.verification.start") == 0) {
+        olmSas = olm_sas(malloc(olm_sas_size()));
+        void * sasRandomBytes = malloc(olm_create_sas_random_length(olmSas));
+        olm_create_sas(olmSas,
+            sasRandomBytes,
+            olm_create_sas_random_length(olmSas));
+        
+        OlmUtility * olmUtil = olm_utility(malloc(olm_utility_size()));
+        
+        STATIC char publicKey[64];
+        STATIC char keyStartJsonCanonical[512];
+        STATIC char concat[512+64];
+        STATIC char commitment[1024];
+        olm_sas_get_pubkey(olmSas,
+            publicKey,
+            64);
+        printf("public key: %.*s\n", olm_sas_pubkey_length(olmSas), publicKey);
+
+        const char * keyStartJson;
+        int keyStartJsonLen;
+        mjson_find(event, eventLen, "$.content", &keyStartJson, &keyStartJsonLen);
+        JsonCanonicalize(keyStartJson, keyStartJsonLen, keyStartJsonCanonical, 512);
+
+        printf("json:\n%.*s\ncanonical json:\n%s\n", keyStartJsonLen, keyStartJson, keyStartJsonCanonical);
+
+        int concatLen =
+            snprintf(concat, 512+64, "%.*s%s", olm_sas_pubkey_length(olmSas), publicKey, keyStartJsonCanonical);
+
+        int commitmentLen =
+            olm_sha256(olmUtil, concat, concatLen, commitment, 1024);
+        
+        STATIC char verificationAcceptBuffer[512];
+        snprintf(verificationAcceptBuffer, 512,
+            "{"
+            "\"commitment\":\"%.*s\","
+            "\"hash\":\"sha256\","
+            "\"key_agreement_protocol\":\"curve25519\","
+            "\"message_authentication_code\":\"hkdf-hmac-sha256.v2\","
+            "\"method\":\"m.sas.v1\","
+            "\"short_authentication_string\":[\"decimal\"],"
+            "\"transaction_id\":\"%s\""
+            "}",
+            commitmentLen, commitment,
+            transactionId);
+        
+        MatrixClientSendToDevice(client,
+            client->userId,
+            verifyFromDeviceId,
+            verificationAcceptBuffer,
+            "m.key.verification.accept");
+    }
+    else if (strcmp(eventType, "m.key.verification.key") == 0) {
+        STATIC char publicKey[128];
+        olm_sas_get_pubkey(olmSas,
+            publicKey,
+            128);
+
+        STATIC char theirPublicKey[128];
+        int theirPublicKeyLen =
+            mjson_get_string(event, eventLen, "$.content.key", theirPublicKey, 128);
+        
+        printf("event: %.*s\n", eventLen, event);
+        printf("theirPublicKey: %.*s\n", theirPublicKeyLen, theirPublicKey);
+        printf("publicKey: %.*s\n", olm_sas_pubkey_length(olmSas), publicKey);
+
+        olm_sas_set_their_key(olmSas, theirPublicKey, theirPublicKeyLen);
+        
+        STATIC char verificationKeyBuffer[256];
+        snprintf(verificationKeyBuffer, 256,
+            "{"
+            "\"key\":\"%.*s\","
+            "\"transaction_id\":\"%s\""
+            "}",
+            olm_sas_pubkey_length(olmSas), publicKey,
+            transactionId);
+        
+        MatrixClientSendToDevice(client,
+            client->userId,
+            verifyFromDeviceId,
+            verificationKeyBuffer,
+            "m.key.verification.key");
+        
+        // sas
+        STATIC char hkdfInfo[1024];
+        int hkdfInfoLen =
+            snprintf(hkdfInfo, 1024,
+                "MATRIX_KEY_VERIFICATION_SAS%s%s%s%s%s",
+                client->userId,
+                verifyFromDeviceId,
+                client->userId,
+                client->deviceId,
+                transactionId);
+
+        unsigned char sasBytes[5];
+        olm_sas_generate_bytes(olmSas,
+            hkdfInfo, hkdfInfoLen,
+            sasBytes, 5);
+        int b0 = sasBytes[0];
+        int b1 = sasBytes[1];
+        int b2 = sasBytes[2];
+        int b3 = sasBytes[3];
+        int b4 = sasBytes[4];
+        
+        printf("%d %d %d %d %d\n", b0, b1, b2, b3, b4);
+
+        // https://spec.matrix.org/v1.7/client-server-api/#sas-method-decimal
+        printf("%d | %d | %d\n",
+            (b0 << 5 | b1 >> 3) + 1000,
+            ((b1 & 0x7) << 10 | b2 << 2 | b3 >> 6) + 1000,
+            ((b3 & 0x3F) << 7 | b4 >> 1) + 1000);
+        printf("%d | %d | %d\n",
+            ((b0 << 5) | (b1 >> 3)) + 1000,
+            (((b1 & 0x7) << 10) | (b2 << 2) | (b3 >> 6)) + 1000,
+            (((b3 & 0x3F) << 7) | (b4 >> 1)) + 1000);
+    }
+    else if (strcmp(eventType, "m.key.verification.mac") == 0) {        
+        // mac
+        STATIC char masterKey[123];
+        MatrixClientRequestMasterKey(client, masterKey, 123);
+
+        STATIC char keyList[256];
+        STATIC char keyListMac[256];
+        STATIC char key1Id[128];
+        STATIC char key1[128];
+        STATIC char key1Mac[128];
+        STATIC char key2Id[128];
+        STATIC char key2[128];
+        STATIC char key2Mac[128];
+
+        if (strcmp(masterKey, client->deviceId) < 0) {
+            snprintf(key1Id, 1024, "ed25519:%s", masterKey);
+            strcpy(key1, masterKey);
+            snprintf(key2Id, 1024, "ed25519:%s", client->deviceId);
+            MatrixOlmAccountGetSigningKey(&client->olmAccount, key2, 1024);
+        }
+        else {
+            snprintf(key1Id, 1024, "ed25519:%s", client->deviceId);
+            MatrixOlmAccountGetSigningKey(&client->olmAccount, key1, 1024);
+            snprintf(key2Id, 1024, "ed25519:%s", masterKey);
+            strcpy(key2, masterKey);
+        }
+
+        snprintf(keyList, 1024,
+            "%s,%s", key1Id, key2Id);
+        
+        STATIC char macInfo[1024];
+        int macInfoLen;
+        {
+            macInfoLen =
+                snprintf(macInfo, 1024,
+                    "MATRIX_KEY_VERIFICATION_MAC%s%s%s%s%s%s",
+                    client->userId,
+                    client->deviceId,
+                    client->userId,
+                    verifyFromDeviceId,
+                    transactionId,
+                    "KEY_IDS");
+            olm_sas_calculate_mac_fixed_base64(olmSas, keyList, strlen(keyList), macInfo, macInfoLen, keyListMac, 1024);
+        }
+        {
+            macInfoLen =
+                snprintf(macInfo, 1024,
+                    "MATRIX_KEY_VERIFICATION_MAC%s%s%s%s%s%s",
+                    client->userId,
+                    client->deviceId,
+                    client->userId,
+                    verifyFromDeviceId,
+                    transactionId,
+                    key1Id);
+            olm_sas_calculate_mac_fixed_base64(olmSas, key1, strlen(key1), macInfo, macInfoLen, key1Mac, 1024);
+        }
+        {
+            macInfoLen =
+                snprintf(macInfo, 1024,
+                    "MATRIX_KEY_VERIFICATION_MAC%s%s%s%s%s%s",
+                    client->userId,
+                    client->deviceId,
+                    client->userId,
+                    verifyFromDeviceId,
+                    transactionId,
+                    key2Id);
+            olm_sas_calculate_mac_fixed_base64(olmSas, key2, strlen(key2), macInfo, macInfoLen, key2Mac, 1024);
+        }
+
+        STATIC char verificationMacBuffer[1024];
+        snprintf(verificationMacBuffer, 1024,
+            "{"
+            "\"keys\":\"%s\","
+            "\"mac\":{"
+            "\"%s\":\"%s\","
+            "\"%s\":\"%s\""
+            "},"
+            "\"transaction_id\":\"%s\""
+            "}",
+            keyListMac,
+            key1Id,
+            key1Mac,
+            key2Id,
+            key2Mac,
+            transactionId);
+        
+        MatrixClientSendToDevice(client,
+            client->userId,
+            verifyFromDeviceId,
+            verificationMacBuffer,
+            "m.key.verification.mac");
+
+        STATIC char verificationDoneBuffer[128];
+        snprintf(verificationDoneBuffer, 128,
+            "{"
+            "\"transaction_id\":\"%s\""
+            "}",
+            transactionId);
+        
+        MatrixClientSendToDevice(client,
+            client->userId,
+            verifyFromDeviceId,
+            verificationDoneBuffer,
+            "m.key.verification.done");
+        
+        free(olmSas);
+        client->verified = true;
+    }
+    else if (strcmp(eventType, "m.room.encrypted") == 0) {
+        STATIC char algorithm[128];
+        mjson_get_string(event, eventLen, "$.content.algorithm", algorithm, 128);
+
+        if (strcmp(algorithm, "m.olm.v1.curve25519-aes-sha2") == 0) {
+            STATIC char thisDeviceKey[DEVICE_KEY_SIZE];
+            MatrixOlmAccountGetDeviceKey(&client->olmAccount, thisDeviceKey, DEVICE_KEY_SIZE);
+
+            STATIC char jp[128];
+            snprintf(jp, 128, "$.content.ciphertext.%s.type", thisDeviceKey);
+
+            double messageType;
+            mjson_get_number(event, eventLen, jp, &messageType);
+            int messageTypeInt = (int)messageType;
+
+            snprintf(jp, 128, "$.content.ciphertext.%s.body", thisDeviceKey);
+
+            mjson_get_string(event, eventLen, jp, g_EncryptedEventBuffer, 2048);
+
+            MatrixOlmSession * olmSession;
+            
+            if (! MatrixClientGetOlmSession(client, client->userId, verifyFromDeviceId, &olmSession))
+            {
+                if (messageTypeInt == 0) {
+                    MatrixClientNewOlmSessionIn(client,
+                        client->userId,
+                        verifyFromDeviceId,
+                        g_EncryptedEventBuffer,
+                        &olmSession);
+                }
+                else {
+                    MatrixClientNewOlmSessionOut(client,
+                        client->userId,
+                        verifyFromDeviceId,
+                        &olmSession);
+                }
+            }
+            
+            STATIC char decrypted[2048];
+            MatrixOlmSessionDecrypt(olmSession,
+                messageTypeInt, g_EncryptedEventBuffer, decrypted, 2048);
+            
+            MatrixClientHandleEvent(client, decrypted, strlen(decrypted));
+        }
+    }
+    else if (strcmp(eventType, "m.room_key") == 0 ||
+             strcmp(eventType, "m.forwarded_room_key") == 0) {
+        STATIC char roomId[128];
+        STATIC char sessionId[128];
+        STATIC char sessionKey[1024];
+        mjson_get_string(event, eventLen, "$.content.room_id", roomId, 128);
+        mjson_get_string(event, eventLen, "$.content.session_id", sessionId, 128);
+        mjson_get_string(event, eventLen, "$.content.session_key", sessionKey, 1024);
+        
+        printf("sessionId: %s\n", sessionId);
+        printf("sessionKey: %s\n", sessionKey);
+
+        MatrixMegolmInSession * megolmInSession;
+        MatrixClientNewMegolmInSession(client, roomId, sessionId, sessionKey, &megolmInSession);
+    }
+}
+
+void
+MatrixClientHandleRoomEvent(
+    MatrixClient * client,
+    const char * room, int roomLen,
+    const char * event, int eventLen)
+{
+    STATIC char eventType[128];
+    memset(eventType, 0, sizeof(eventType));
+    mjson_get_string(event, eventLen, "$.type", eventType, 128);
+
+    if (strcmp(eventType, "m.room.encrypted") == 0) {
+        STATIC char algorithm[128];
+        mjson_get_string(event, eventLen, "$.content.algorithm", algorithm, 128);
+
+        if (strcmp(algorithm, "m.megolm.v1.aes-sha2") == 0) {
+            STATIC char sessionId[128];
+            int sessionIdLen =
+                mjson_get_string(event, eventLen, "$.content.session_id", sessionId, 128);
+
+            bool res;
+
+            MatrixMegolmInSession * megolmInSession;
+            res = MatrixClientGetMegolmInSession(client,
+                room, roomLen,
+                sessionId, sessionIdLen,
+                &megolmInSession);
+
+            if (res) {
+                mjson_get_string(event, eventLen, "$.content.ciphertext", g_EncryptedEventBuffer, 2048);
+
+                STATIC char decrypted[2048];
+                MatrixMegolmInSessionDecrypt(megolmInSession, g_EncryptedEventBuffer, strlen(g_EncryptedEventBuffer), decrypted, 2048);
+
+                MatrixClientHandleEvent(client, decrypted, strlen(decrypted));
+            }
+            else {
+                printf("megolm session not known\n");
+            }
+        }
+    }
+    MatrixClientHandleEvent(client, event, eventLen);
+}
+
+void
+MatrixClientHandleSync(
+    MatrixClient * client,
+    char * syncBuffer, int syncBufferLen,
+    char * nextBatch, int nextBatchCap)
+{    
+    int res;
+
+    const char * s = syncBuffer;
+    int slen = syncBufferLen;
+
+    mjson_get_string(s, slen, "$.next_batch", nextBatch, nextBatchCap);
+
+    // to_device
+
+    const char * events;
+    int eventsLen;
+    res =
+        mjson_find(s, slen, "$.to_device.events", &events, &eventsLen);
+    
+    if (res != MJSON_TOK_INVALID) {
+        {
+        int koff, klen, voff, vlen, vtype, off = 0;
+        for (off = 0; (off = mjson_next(events, eventsLen, off, &koff, &klen,
+                                        &voff, &vlen, &vtype)) != 0; ) {
+            const char * v = events + voff;
+
+            MatrixClientHandleEvent(client, v, vlen);
+        }
+        }
+    }
+
+    // rooms
+    
+    const char * rooms;
+    int roomsLen;
+    res =
+        mjson_find(s, slen, "$.rooms.join", &rooms, &roomsLen);
+    
+    if (res != MJSON_TOK_INVALID) {
+        {
+        int koff, klen, voff, vlen, vtype, off = 0;
+        for (off = 0; (off = mjson_next(rooms, roomsLen, off, &koff, &klen,
+                                        &voff, &vlen, &vtype)) != 0; ) {
+            const char * k = rooms + koff;
+            const char * v = rooms + voff;
+
+            const char * events;
+            int eventsLen;
+            res =
+                mjson_find(v, vlen, "$.timeline.events", &events, &eventsLen);
+            
+            if (res != MJSON_TOK_INVALID) {
+                {
+                int koff2, klen2, voff2, vlen2, vtype2, off2 = 0;
+                for (off2 = 0; (off2 = mjson_next(events, eventsLen, off2, &koff2, &klen2,
+                                                &voff2, &vlen2, &vtype2)) != 0; ) {
+                    const char * v2 = events + voff2;
+
+                    MatrixClientHandleRoomEvent(client,
+                        k+1, klen-2,
+                        v2, vlen2);
+                }
+                }
+            }
+        }
+        }
+    }
+}
+
 // https://spec.matrix.org/v1.6/client-server-api/#get_matrixclientv3sync
 bool
 MatrixClientSync(
     MatrixClient * client,
     char * outSyncBuffer, int outSyncCap,
-    const char * nextBatch)
+    char * nextBatch, int nextBatchCap)
 {
     // filter={\"event_fields\":[\"to_device\"]}
     STATIC char url[MAX_URL_LEN];
@@ -1030,11 +1337,17 @@ MatrixClientSync(
     }
     url[index] = '\0';
 
-    return
+    bool result =
         MatrixHttpGet(client->hc,
             url,
             outSyncBuffer, outSyncCap,
             true);
+    
+    MatrixClientHandleSync(client,
+        outSyncBuffer, strlen(outSyncBuffer),
+        nextBatch, nextBatchCap);
+    
+    return result;
 }
 
 // https://spec.matrix.org/v1.7/client-server-api/#get_matrixclientv3roomsroomideventeventid
@@ -1258,6 +1571,8 @@ MatrixClientGetOlmSession(
     const char * deviceId,
     MatrixOlmSession ** outSession)
 {
+    (void)userId; //unused for now
+
     for (int i = 0; i < client->numOlmSessions; i++)
     {
         if (strcmp(client->olmSessions[i].deviceId, deviceId) == 0)
@@ -1278,6 +1593,8 @@ MatrixClientNewOlmSessionIn(
     const char * encrypted,
     MatrixOlmSession ** outSession)
 {
+    (void)userId; //unused for now
+    
     if (client->numOlmSessions < NUM_OLM_SESSIONS)
     {
         STATIC char deviceKey[DEVICE_KEY_SIZE];
@@ -1406,10 +1723,10 @@ MatrixClientSendToDeviceEncrypted(
         "\"sender\":\"%s\","
         "\"recipient\":\"%s\","
         "\"recipient_keys\":{"
-          "\"ed25519\":\"%s\""
+        "\"ed25519\":\"%s\""
         "},"
         "\"keys\":{"
-          "\"ed25519\":\"%s\""
+        "\"ed25519\":\"%s\""
         "}"
         "}",
         msgType,
@@ -1440,6 +1757,7 @@ MatrixClientSendToDeviceEncrypted(
         "\"sender_key\":\"%s\""
         "}",
         targetDeviceKey,
+        // olm_encrypt_message_length(olmSession->session, strlen(g_TodeviceEventBuffer)), g_EncryptedRequestBuffer,
         g_EncryptedRequestBuffer,
         olm_session_has_received_message(olmSession->session),
         client->deviceId,
@@ -1474,6 +1792,15 @@ MatrixClientFindDevice(
     const char * deviceId,
     MatrixDevice ** outDevice)
 {
+    for (int i = 0; i < client->numDevices; i++)
+    {
+        if (strcmp(client->devices[i].deviceId, deviceId) == 0)
+        {
+            *outDevice = &client->devices[i];
+            return true;
+        }
+    }
+
     MatrixClientRequestDeviceKeys(client);
 
     for (int i = 0; i < client->numDevices; i++)
@@ -1539,6 +1866,26 @@ MatrixClientRequestSigningKey(
     return false;
 }
 
+bool
+MatrixClientRequestMasterKey(
+    MatrixClient * client,
+    char * outMasterKey, int outMasterKeyCap)
+{
+    if (strlen(client->masterKey) > 0) {
+        strncpy(outMasterKey, outMasterKeyCap, client->masterKey);
+        return true;
+    }
+
+    MatrixClientRequestDeviceKeys(client);
+    
+    if (strlen(client->masterKey) > 0) {
+        strncpy(outMasterKey, outMasterKeyCap, client->masterKey);
+        return true;
+    }
+
+    return false;
+}
+
 // https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3keysquery
 bool
 MatrixClientRequestDeviceKeys(
@@ -1569,17 +1916,31 @@ MatrixClientRequestDeviceKeys(
 
     // query for retrieving device keys for user id
     STATIC char query[JSON_QUERY_SIZE];
+    const char * s;
+    int slen;
+
+    snprintf(query, JSON_QUERY_SIZE,
+        "$.master_keys.%s.keys", userIdEscaped);
+    mjson_find(responseBuffer, strlen(responseBuffer),
+        query, &s, &slen);
+    
+    int koff, klen, voff, vlen, vtype, off = 0;
+    for (off = 0; (off = mjson_next(s, slen, off, &koff, &klen,
+                                    &voff, &vlen, &vtype)) != 0; ) {
+        snprintf(client->masterKey, MASTER_KEY_SIZE,
+            "%.*s", vlen-2, s+voff+1);
+
+        printf("found master key: %s\n", client->masterKey);
+    }
+
     snprintf(query, JSON_QUERY_SIZE,
         "$.device_keys.%s", userIdEscaped);
     
-    const char * s;
-    int slen;
     mjson_find(responseBuffer, strlen(responseBuffer),
         query, &s, &slen);
     
     // loop over keys
     
-    int koff, klen, voff, vlen, vtype, off = 0;
     for (off = 0; (off = mjson_next(s, slen, off, &koff, &klen,
                                     &voff, &vlen, &vtype)) != 0; ) {
         const char * key = s + koff;
