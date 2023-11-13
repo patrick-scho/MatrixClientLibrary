@@ -11,10 +11,9 @@ int
 main(void)
 {
     MatrixClient client;
-    MatrixClientInit(&client,
-        SERVER);
+    MatrixClientInit(&client);
     
-    MatrixHttpInit(&client);
+    MatrixHttpInit(&client, SERVER);
     
     MatrixClientSetAccessToken(&client, ACCESS_TOKEN);
     MatrixClientSetDeviceId(&client, DEVICE_ID);
@@ -26,7 +25,9 @@ main(void)
     MatrixClientUploadOnetimeKeys(&client);
     MatrixClientUploadDeviceKeys(&client);
 
-    printf("device key: %s\n", client.deviceKey);
+    char deviceKey[DEVICE_KEY_SIZE];
+    MatrixOlmAccountGetDeviceKey(&client.olmAccount, deviceKey, DEVICE_KEY_SIZE);
+    printf("device key: %s\n", deviceKey);
         
     MatrixHttpDeinit(&client);
 

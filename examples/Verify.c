@@ -291,13 +291,13 @@ HandleEvent(
 
             MatrixOlmSession * olmSession;
             if (messageTypeInt == 0) {
-                MatrixClientGetOlmSessionIn(client,
+                MatrixClientNewOlmSessionIn(client,
                     USER_ID,
                     DEVICE_ID,
                     encrypted,
                     &olmSession);
             } else {
-                MatrixClientGetOlmSessionOut(client,
+                MatrixClientNewOlmSessionOut(client,
                     USER_ID,
                     DEVICE_ID,
                     &olmSession);
@@ -479,9 +479,8 @@ int
 main(void)
 {
     MatrixClient client;
-    MatrixClientInit(&client,
-        SERVER);
-    MatrixHttpInit(&client);
+    MatrixClientInit(&client);
+    MatrixHttpInit(&client.hc, SERVER);
     MatrixClientSetUserId(&client, USER_ID);
 
     MatrixClientLoginPassword(&client,
@@ -491,7 +490,7 @@ main(void)
     printf("deviceId: %s\n", client.deviceId);
     MatrixClientGenerateOnetimeKeys(&client, 10);
     MatrixClientUploadOnetimeKeys(&client);
-    MatrixClientUploadDeviceKey(&client);
+    MatrixClientUploadDeviceKeys(&client);
 
     static char eventBuffer[1024];
     MatrixClientGetRoomEvent(&client,
@@ -535,7 +534,7 @@ main(void)
 
     MatrixClientDeleteDevice(&client);
         
-    MatrixHttpDeinit(&client);
+    MatrixHttpDeinit(&client.hc);
 
     return 0;
 }

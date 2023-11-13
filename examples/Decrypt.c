@@ -26,10 +26,9 @@ int
 main(void)
 {
     MatrixClient client;
-    MatrixClientInit(&client,
-        SERVER);
+    MatrixClientInit(&client);
     
-    MatrixHttpInit(&client);
+    MatrixHttpInit(&client.hc, SERVER);
 
     MatrixClientSetUserId(&client, USER_ID);
 
@@ -42,7 +41,7 @@ main(void)
 
     MatrixClientGenerateOnetimeKeys(&client, 10);
     MatrixClientUploadOnetimeKeys(&client);
-    MatrixClientUploadDeviceKey(&client);
+    MatrixClientUploadDeviceKeys(&client);
 
     static char eventBuffer[1024];
     MatrixClientGetRoomEvent(&client,
@@ -94,8 +93,7 @@ main(void)
         128);
     GetLine(keyStartJson, 1024);
     printf("keyStartJson: %s\n", keyStartJson);
-    int concatLen =
-        snprintf(concat, 1024, "%s%s", publicKey, keyStartJson);
+    snprintf(concat, 1024, "%s%s", publicKey, keyStartJson);
     printf("concat: %s\n", concat);
     olm_sha256(olmUtil, concat, strlen(concat), commitment, 256);
     printf("hash: %s\n", commitment);
@@ -290,15 +288,12 @@ main(void)
 
     getchar();
     
-    MatrixMegolmInSession megolmSession;
-    
     MatrixClientRequestMegolmInSession(&client,
         ROOM_ID,
         SESSION_ID,
         SENDER_KEY,
         USER_ID,
-        DEVICE_ID,
-        &megolmSession);
+        DEVICE_ID);
 
     // // decrypt room key
 
@@ -310,7 +305,7 @@ main(void)
     static char encrypted[2048];
     static char decrypted[2048];
     printf("encrypted:");
-    gets(encrypted);
+    fgets(encrypted, 2048, stdin);
     printf("(%d) %s;\n", strlen(encrypted), encrypted);
     MatrixOlmSessionDecrypt(olmSession,
         1, encrypted, decrypted, 2048);
@@ -337,7 +332,7 @@ main(void)
 
     MatrixClientDeleteDevice(&client);
         
-    MatrixHttpDeinit(&client);
+    MatrixHttpDeinit(&client.hc);
 
     return 0;
 }

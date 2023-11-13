@@ -96,7 +96,7 @@ ExecuteCommand(
         MatrixClientUploadOnetimeKeys(client);
     }
     else if (CheckCommand(cmd, "uploaddevicekey")) {
-        MatrixClientUploadDeviceKey(client);
+        MatrixClientUploadDeviceKeys(client);
     }
     else if (CheckCommand(cmd, "onetimekeys")) {
         static char buffer[1024];
@@ -131,7 +131,7 @@ ExecuteCommand(
     else if (CheckCommand(cmd, "todevice")) {
         static char buffer[30000];
         MatrixClientSync(client,
-            buffer, 30000);
+            buffer, 30000, "");
         const char * todevice;
         int todeviceLen;
         mjson_find(buffer, 30000,
@@ -249,8 +249,10 @@ ExecuteCommand(
     else if (CheckCommand(cmd, "initsession")) {
         CHECK_ARGS(1, "<room_id>")
 
-        if (! MatrixClientInitMegolmOutSession(client,
-            args[0]))
+        MatrixMegolmOutSession * megolmOutSession;
+        if (! MatrixClientNewMegolmOutSession(client,
+            args[0],
+            &megolmOutSession))
         {
             printf("Maximum number of Megolm sessions reached (%d)\n", NUM_MEGOLM_SESSIONS);
         }
@@ -269,16 +271,15 @@ int
 main(void)
 {
     MatrixClient client;
-    MatrixClientInit(&client,
-        SERVER);
+    MatrixClientInit(&client);
     
-    MatrixHttpInit(&client);
+    MatrixHttpInit(&client.hc, SERVER);
 
 
     MatrixClientSetUserId(&client, USER_ID);
     MatrixClientLoginPassword(&client, "@pscho:matrix.org", "Wc23EbmB9G3faMq", "abc");
     MatrixClientGenerateOnetimeKeys(&client, 10);
-    MatrixClientUploadDeviceKey(&client);
+    MatrixClientUploadDeviceKeys(&client);
     MatrixClientUploadOnetimeKeys(&client);
 
 
@@ -300,7 +301,7 @@ main(void)
     
     MatrixClientDeleteDevice(&client);
 
-    MatrixHttpDeinit(&client);
+    MatrixHttpDeinit(&client.hc);
 
     return 0;
 }

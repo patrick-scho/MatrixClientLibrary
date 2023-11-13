@@ -11,10 +11,9 @@ int
 main(void)
 {
     MatrixClient client;
-    MatrixClientInit(&client,
-        SERVER);
+    MatrixClientInit(&client);
     
-    MatrixHttpInit(&client);
+    MatrixHttpInit(&client.hc, SERVER);
 
     MatrixClientLoginPassword(&client,
         USERNAME,
@@ -26,7 +25,7 @@ main(void)
     printf("Expires in (ms): %s\n", client.expireMs);
     printf("Refresh Token: %s\n", client.refreshToken);
     
-    MatrixHttpDeinit(&client);
+    MatrixHttpDeinit(&client.hc);
 
     return 0;
 }

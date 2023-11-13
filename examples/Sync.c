@@ -16,10 +16,9 @@ int
 main(void)
 {
     MatrixClient client;
-    MatrixClientInit(&client,
-        SERVER);
+    MatrixClientInit(&client);
     
-    MatrixHttpInit(&client);
+    MatrixHttpInit(&client.hc, SERVER);
 
     MatrixClientSetUserId(&client, USER_ID);
 
@@ -30,7 +29,7 @@ main(void)
     
     MatrixClientGenerateOnetimeKeys(&client, 10);
     MatrixClientUploadOnetimeKeys(&client);
-    MatrixClientUploadDeviceKey(&client);
+    MatrixClientUploadDeviceKeys(&client);
     
 
     static char eventBuffer[1024];
@@ -87,7 +86,7 @@ main(void)
 
     MatrixClientDeleteDevice(&client);
         
-    MatrixHttpDeinit(&client);
+    MatrixHttpDeinit(&client.hc);
 
     return 0;
 }

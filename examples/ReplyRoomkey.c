@@ -11,10 +11,9 @@ int
 main(void)
 {
     MatrixClient client;
-    MatrixClientInit(&client,
-        SERVER);
+    MatrixClientInit(&client);
     
-    MatrixHttpInit(&client);
+    MatrixHttpInit(&client.hc, SERVER);
 
     MatrixClientSetAccessToken(&client,
         ACCESS_TOKEN);
@@ -34,7 +33,7 @@ main(void)
         "ULZZOKJBYN",
         &client.megolmOutSessions[0]);
         
-    MatrixHttpDeinit(&client);
+    MatrixHttpDeinit(&client.hc);
 
     return 0;
 }
