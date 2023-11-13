@@ -12,6 +12,10 @@
 typedef struct MatrixHttpConnection {
     struct mg_mgr mgr;
     struct mg_connection * connection;
+    
+    const char * host;
+    const char * accessToken;
+
     bool connected;
     char * data;
     int dataCap;
@@ -26,15 +30,14 @@ MatrixHttpCallback(
     void *ev_data,
     void *fn_data)
 {
-    MatrixClient * client = (MatrixClient *)fn_data;
-    MatrixHttpConnection * conn = (MatrixHttpConnection *)client->httpUserData;
+    MatrixHttpConnection * conn = (MatrixHttpConnection *)fn_data;
 
     if (ev == MG_EV_CONNECT)
     {
-        struct mg_str host = mg_url_host(client->server);
+        struct mg_str host = mg_url_host(conn->host);
 
         // If s_url is https://, tell client connection to use TLS
-        if (mg_url_is_ssl(client->server))
+        if (mg_url_is_ssl(conn->host))
         {
             static struct mg_tls_opts opts;
             opts.srvname = host;
@@ -70,67 +73,74 @@ MatrixHttpCallback(
 }
 
 bool
-MatrixHttpInit(
-    MatrixClient * client)
-{
-    MatrixHttpConnection * conn =
-        (MatrixHttpConnection *)malloc(sizeof(MatrixHttpConnection));
+MatrixHttpConnect(
+    MatrixHttpConnection * hc)
+{    
+    //struct mg_connection * c =
+        mg_http_connect(&hc->mgr, hc->host, MatrixHttpCallback, hc);
 
-    client->httpUserData = conn;
-    
-    mg_mgr_init(&conn->mgr);
+    while (! hc->connected)
+        mg_mgr_poll(&hc->mgr, 1000);
 
-    return MatrixHttpConnect(client);
+    return hc->connected;
 }
 
 bool
-MatrixHttpConnect(
-    MatrixClient * client)
+MatrixHttpInit(
+    MatrixHttpConnection ** hc,
+    const char * host)
 {
-    MatrixHttpConnection * conn =
-        (MatrixHttpConnection *)client->httpUserData;
+    *hc = (MatrixHttpConnection *)calloc(1, sizeof(MatrixHttpConnection));
     
-    //struct mg_connection * c =
-        mg_http_connect(&conn->mgr, client->server, MatrixHttpCallback, client);
+    (*hc)->host = host;
+    
+    mg_mgr_init(&(*hc)->mgr);
 
-    while (! conn->connected)
-        mg_mgr_poll(&conn->mgr, 1000);
+    MatrixHttpConnect(*hc);
 
-    return conn->connected;
+    return true;
 }
 
 bool
 MatrixHttpDeinit(
-    MatrixClient * client)
+    MatrixHttpConnection ** hc)
 {
-    MatrixHttpConnection * conn = (MatrixHttpConnection *)client->httpUserData;
-    
-    mg_mgr_free(&conn->mgr);
+    mg_mgr_free(&(*hc)->mgr);
 
-    free(conn);
+    free(*hc);
+    *hc = NULL;
+
+    return true;
+}
+
+bool
+MatrixHttpSetAccessToken(
+    MatrixHttpConnection * hc,
+    const char * accessToken)
+{
+    hc->accessToken = accessToken;
 
     return true;
 }
 
 bool
 MatrixHttpGet(
-    MatrixClient * client,
+    MatrixHttpConnection * hc,
     const char * url,
     char * outResponseBuffer, int outResponseCap,
     bool authenticated)
 {
-    MatrixHttpConnection * conn = (MatrixHttpConnection *)client->httpUserData;
-    if (! conn->connected)
-        MatrixHttpConnect(client);
+    if (! hc->connected)
+        MatrixHttpConnect(hc);
 
-    conn->dataReceived = false;
+    hc->dataReceived = false;
 
-    struct mg_str host = mg_url_host(client->server);
+    struct mg_str host = mg_url_host(hc->host);
 
     static char authorizationHeader[AUTHORIZATION_HEADER_LEN];
     if (authenticated)
         sprintf(authorizationHeader,
-            "Authorization: Bearer %s\r\n", client->accessToken);
+            "Authorization: Bearer %s\r\n", hc->accessToken);
         // sprintf_s(authorizationHeader, AUTHORIZATION_HEADER_LEN,
         //     "Authorization: Bearer %s\r\n", client->accessToken);
     else
@@ -145,7 +155,7 @@ MatrixHttpGet(
         host.len, host.ptr,
         authorizationHeader);
 
-    mg_printf(conn->connection,
+    mg_printf(hc->connection,
         "GET %s HTTP/1.1\r\n"
         "Host: %.*s\r\n"
         "%s"
@@ -154,35 +164,34 @@ MatrixHttpGet(
         host.len, host.ptr,
         authorizationHeader);
 
-    conn->data = outResponseBuffer;
-    conn->dataCap = outResponseCap;
+    hc->data = outResponseBuffer;
+    hc->dataCap = outResponseCap;
     
-    while (! conn->dataReceived)
-        mg_mgr_poll(&conn->mgr, 1000);
+    while (! hc->dataReceived)
+        mg_mgr_poll(&hc->mgr, 1000);
 
-    return conn->dataReceived;
+    return hc->dataReceived;
 }
 
 bool
 MatrixHttpPost(
-    MatrixClient * client,
+    MatrixHttpConnection * hc,
     const char * url,
     const char * requestBuffer,
     char * outResponseBuffer, int outResponseCap,
     bool authenticated)
 {
-    MatrixHttpConnection * conn = (MatrixHttpConnection *)client->httpUserData;
-    if (! conn->connected)
-        MatrixHttpConnect(client);
+    if (! hc->connected)
+        MatrixHttpConnect(hc);
 
-    conn->dataReceived = false;
+    hc->dataReceived = false;
 
-    struct mg_str host = mg_url_host(client->server);
+    struct mg_str host = mg_url_host(hc->host);
 
     static char authorizationHeader[AUTHORIZATION_HEADER_LEN];
     if (authenticated)
         sprintf(authorizationHeader,
-            "Authorization: Bearer %s\r\n", client->accessToken);
+            "Authorization: Bearer %s\r\n", hc->accessToken);
     else
         authorizationHeader[0] = '\0';
 
@@ -201,7 +210,7 @@ MatrixHttpPost(
             strlen(requestBuffer),
             requestBuffer);
 
-    mg_printf(conn->connection,
+    mg_printf(hc->connection,
             "POST %s HTTP/1.0\r\n"
             "Host: %.*s\r\n"
             "%s"
@@ -216,35 +225,34 @@ MatrixHttpPost(
             strlen(requestBuffer),
             requestBuffer);
 
-    conn->data = outResponseBuffer;
-    conn->dataCap = outResponseCap;
+    hc->data = outResponseBuffer;
+    hc->dataCap = outResponseCap;
     
-    while (! conn->dataReceived)
-        mg_mgr_poll(&conn->mgr, 1000);
+    while (! hc->dataReceived)
+        mg_mgr_poll(&hc->mgr, 1000);
 
-    return conn->dataReceived;
+    return hc->dataReceived;
 }
 
 bool
 MatrixHttpPut(
-    MatrixClient * client,
+    MatrixHttpConnection * hc,
     const char * url,
     const char * requestBuffer,
     char * outResponseBuffer, int outResponseCap,
     bool authenticated)
 {
-    MatrixHttpConnection * conn = (MatrixHttpConnection *)client->httpUserData;
-    if (! conn->connected)
-        MatrixHttpConnect(client);
+    if (! hc->connected)
+        MatrixHttpConnect(hc);
 
-    conn->dataReceived = false;
+    hc->dataReceived = false;
 
-    struct mg_str host = mg_url_host(client->server);
+    struct mg_str host = mg_url_host(hc->host);
 
     static char authorizationHeader[AUTHORIZATION_HEADER_LEN];
     if (authenticated)
         sprintf(authorizationHeader,
-            "Authorization: Bearer %s\r\n", client->accessToken);
+            "Authorization: Bearer %s\r\n", hc->accessToken);
     else
         authorizationHeader[0] = '\0';
 
@@ -264,7 +272,7 @@ MatrixHttpPut(
             strlen(requestBuffer),
             requestBuffer);
 
-    mg_printf(conn->connection,
+    mg_printf(hc->connection,
             "PUT %s HTTP/1.0\r\n"
             "Host: %.*s\r\n"
             "%s"
@@ -279,11 +287,11 @@ MatrixHttpPut(
             strlen(requestBuffer),
             requestBuffer);
 
-    conn->data = outResponseBuffer;
-    conn->dataCap = outResponseCap;
+    hc->data = outResponseBuffer;
+    hc->dataCap = outResponseCap;
     
-    while (! conn->dataReceived)
-        mg_mgr_poll(&conn->mgr, 1000);
+    while (! hc->dataReceived)
+        mg_mgr_poll(&hc->mgr, 1000);
 
-    return conn->dataReceived;
+    return hc->dataReceived;
 }
