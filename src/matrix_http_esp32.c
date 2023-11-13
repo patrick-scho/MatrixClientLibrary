@@ -141,7 +141,7 @@ MatrixHttpConnect(
 
     hc->client = esp_http_client_init(&config);
 
-    esp_http_client_set_timeout_ms(hc->client, 10000);
+    esp_http_client_set_timeout_ms(hc->client, 20000);
 }
 
 void
@@ -160,7 +160,6 @@ MatrixHttpInit(
     *hc = (MatrixHttpConnection *)calloc(1, sizeof(MatrixHttpConnection));
     
     (*hc)->host = host;
-    (*hc)->dataLen = 0;
 
     MatrixHttpConnect(*hc);
 
