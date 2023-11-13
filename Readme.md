@@ -7,8 +7,11 @@ Device verification is also supported.
 ## Building
 
 Building requires a C/C++ compiler and make.
+
 To build the dependencies run `make deps`.
+
 To build any of the examples run `make out/examples/<example>`.
+
 To use the library:
 - Add `src/matrix.c` to compilation
 - Add either `src/matrix_http_mongoose.c` or `src/matrix_http_esp32.c` to compilation
@@ -20,7 +23,9 @@ To use the library:
 
 ## Dependencies
 [Mongoose](https://github.com/cesanta/mongoose)
+
 [mjson](https://github.com/cesanta/mjson)
+
 [Olm](https://gitlab.matrix.org/matrix-org/olm)
 
 ## Examples
