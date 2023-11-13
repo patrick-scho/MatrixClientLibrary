@@ -23,6 +23,7 @@
 #define DEVICE_KEY_SIZE 44
 #define SIGNING_KEY_SIZE 44
 #define ONETIME_KEY_SIZE 44
+#define MASTER_KEY_SIZE 44
 
 #define KEY_SHARE_EVENT_LEN 1024
 
@@ -49,7 +50,7 @@
 
 #define NUM_MEGOLM_SESSIONS 2
 #define NUM_OLM_SESSIONS 2
-#define NUM_DEVICES 5
+#define NUM_DEVICES 10
 
 // HTTP
 
@@ -59,10 +60,6 @@ bool
 MatrixHttpInit(
     MatrixHttpConnection ** hc,
     const char * host);
-
-// bool
-// MatrixHttpConnect(
-//     MatrixHttpConnection * hc);
 
 bool
 MatrixHttpDeinit(
@@ -227,18 +224,6 @@ MatrixMegolmOutSessionEncrypt(
     const char * plaintext,
     char * outBuffer, int outBufferCap);
 
-bool
-MatrixMegolmOutSessionSave(
-    MatrixMegolmOutSession * session,
-    const char * filename,
-    const char * key);
-    
-bool
-MatrixMegolmOutSessionLoad(
-    MatrixMegolmOutSession * session,
-    const char * filename,
-    const char * key);
-
 
 // Matrix Client
 
@@ -263,6 +248,9 @@ typedef struct MatrixClient {
     char deviceId[DEVICE_ID_SIZE];
     char expireMs[EXPIRE_MS_SIZE];
     char refreshToken[REFRESH_TOKEN_SIZE];
+    char masterKey[MASTER_KEY_SIZE];
+
+    bool verified;
 
     MatrixHttpConnection * hc;
 } MatrixClient;
@@ -270,16 +258,6 @@ typedef struct MatrixClient {
 bool
 MatrixClientInit(
     MatrixClient * client);
-
-bool
-MatrixClientSave(
-    MatrixClient * client,
-    const char * filename);
-
-bool
-MatrixClientLoad(
-    MatrixClient * client,
-    const char * filename);
 
 bool
 MatrixClientSetAccessToken(
@@ -306,7 +284,7 @@ MatrixClientUploadOnetimeKeys(
     MatrixClient * client);
 
 bool
-MatrixClientUploadDeviceKey(
+MatrixClientUploadDeviceKeys(
     MatrixClient * client);
 
 bool
@@ -337,11 +315,22 @@ MatrixClientSendEventEncrypted(
     const char * msgType,
     const char * msgBody);
 
+void
+HandleEvent(
+    MatrixClient * client,
+    const char * event, int eventLen);
+
+void
+HandleRoomEvent(
+    MatrixClient * client,
+    const char * room, int roomLen,
+    const char * event, int eventLen);
+
 bool
 MatrixClientSync(
     MatrixClient * client,
-    char * outSync, int outSyncCap,
-    const char * nextBatch);
+    char * outSyncBuffer, int outSyncCap,
+    char * nextBatch, int nextBatchCap);
 
 bool
 MatrixClientGetRoomEvent(
@@ -455,6 +444,11 @@ MatrixClientRequestSigningKey(
     MatrixClient * client,
     const char * deviceId,
     char * outSigningKey, int outSigningKeyCap);
+
+bool
+MatrixClientRequestMasterKey(
+    MatrixClient * client,
+    char * outMasterKey, int outMasterKeyCap);
 
 bool
 MatrixClientRequestDeviceKeys(
