@@ -2,6 +2,13 @@
 #include <mjson.h>
 #include <olm/sas.h>
 
+#if !CONFIG_IDF_TARGET_LINUX
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_system.h"
+#include "driver/gpio.h"
+#endif
+
 #include <stdio.h>
 
 #define SERVER       "https://matrix.org"
@@ -513,11 +520,51 @@ main(void)
     }
 
     printf("verified!\n");
+
+    // create and share megolm out session
+    MatrixMegolmOutSession * megolmOutSession;
+    MatrixClientNewMegolmOutSession(client,
+        ROOM_ID,
+        &megolmOutSession);
+    printf("megolm session id: %.10s... key: %.10s...\n", megolmOutSession->id, megolmOutSession->key);
+    MatrixClientShareMegolmOutSession(client,
+        USER_ID,
+        "ULZZOKJBYN",
+        megolmOutSession);
+
     
-    int c;
-    while ((c=getchar()) != 'q') {
-        printf("getchar() = %c [%d]\n", c, c);
-        Sync(client, syncBuffer, SYNC_BUFFER_SIZE);
+    // int c;
+    // while ((c=getchar()) != 'q') {
+    //     vTaskDelay(1000/portTICK_PERIOD_MS);
+
+    //     if (c == 's') {
+    //         Sync(client, syncBuffer, SYNC_BUFFER_SIZE);
+    //     }
+    //     else if (c == 'm') {
+    //         static const char * msgs[] = { "A", "B", "C" };
+    //         static char msg[128];
+    //         snprintf(msg, 128, "{\"body\":\"%s\",\"msgtype\":\"m.text\"}", msgs[rand()%(sizeof(msgs)/sizeof(msgs[0]))]);
+
+    //         MatrixClientSendEventEncrypted(client,
+    //             ROOM_ID,
+    //             "m.room.message",
+    //             msg);
+    //         printf("Message sent. Message index: %d\n", (int)olm_outbound_group_session_message_index(megolmOutSession->session));
+    //     }
+    // }
+
+    for (int i = 0; i < 10; i++) {
+
+        static const char * msgs[] = { "A", "B", "C" };
+        static char msg[128];
+        snprintf(msg, 128, "{\"body\":\"%s\",\"msgtype\":\"m.text\"}", msgs[rand()%(sizeof(msgs)/sizeof(msgs[0]))]);
+
+        MatrixClientSendEventEncrypted(client,
+            ROOM_ID,
+            "m.room.message",
+            msg);
+
+        vTaskDelay(5000/portTICK_PERIOD_MS);
     }
     
     // MatrixClientRequestMegolmInSession(client,
@@ -553,11 +600,26 @@ main(void)
 }
 
 #include "wifi.h"
+#include <esp_netif.h>
 
 void
 app_main(void)
 {
-    wifi_init("Hundehuette", "Affensicherespw55");
+    // wifi_init("Pixel_7762", "affeaffe");
+    // wifi_init("Hundehuette", "Affensicherespw55");
+    wifi_init("test", "/O801i25");
+
+    esp_netif_ip_info_t ip_info;
+    esp_netif_get_ip_info(IP_EVENT_STA_GOT_IP,&ip_info);
+    printf("My IP: " IPSTR "\n", IP2STR(&ip_info.ip));
+    printf("My GW: " IPSTR "\n", IP2STR(&ip_info.gw));
+    printf("My NETMASK: " IPSTR "\n", IP2STR(&ip_info.netmask));
+
+    // uint64_t bitmask = 0xffffffffffffffff;
+    // bitmask = bitmask & SOC_GPIO_VALID_GPIO_MASK;
+    // gpio_dump_io_configuration(stdout, bitmask);
+    gpio_set_direction(GPIO_NUM_2, GPIO_MODE_OUTPUT);
+    // gpio_dump_io_configuration(stdout, bitmask);
 
     main();
 }
