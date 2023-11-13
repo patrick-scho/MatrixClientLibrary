@@ -9,6 +9,7 @@ Device verification is also supported.
 Building requires a C/C++ compiler and make.
 
 To build the dependencies run `make deps`.
+All dependencies are included in this repository.
 
 To build any of the examples run `make out/examples/<example>`.
 
@@ -20,6 +21,17 @@ To use the library:
 - Add include path `ext/olm/include/`
 - Add include path `ext/mjson/src/`
 - Add include path `ext/mongoose/`
+
+To build the example for the ESP32 start an ESP-IDF shell in esp32/esp_project or esp32/esp_project_riscv and run:
+- `idf.py build`
+- `idf.py flash`
+- `idf.py monitor`
+
+To use the library in an ESP-IDF project:
+- Add the matrix and olm components (can be found in `esp32/esp_project/components/`)
+- Add `wifi.c/.h` (can be found in `esp32/esp_project/main/`)
+- Add `SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fpermissive")` to CMakeLists.txt
+- Call `wifi_init("<SSID>", "<PASSWORD>")` before initializing the library
 
 ## Dependencies
 [Mongoose](https://github.com/cesanta/mongoose)
