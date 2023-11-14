@@ -1,9 +1,16 @@
 #include <matrix.h>
 #include <stdio.h>
 
-#define SERVER       "https://matrix.org"
-#define USER_ID      "@pscho:matrix.org"
-#define ROOM_ID      "!XKFUjAsGrSSrpDFIxB:matrix.org"
+#define SERVER        "https://matrix.org"
+#define USER_ID       "@example:matrix.org"
+#define ROOM_ID       "!example:matrix.org"
+#define USERNAME      ""
+#define PASSWORD      ""
+#define DEVICE_NAME   ""
+
+// device id of another device to share the megolm session with
+// I used the device id of a logged in Element web session
+#define DEVICE_ID2   ""
 
 int
 main(void)
@@ -16,9 +23,9 @@ main(void)
     MatrixClientSetUserId(&client, USER_ID);
 
     MatrixClientLoginPassword(&client,
-        "pscho",
-        "Wc23EbmB9G3faMq",
-        "Test1");
+        USERNAME,
+        PASSWORD,
+        DEVICE_NAME);
 
     MatrixClientUploadDeviceKeys(&client);
     MatrixClientGenerateOnetimeKeys(&client, 10);
@@ -33,7 +40,7 @@ main(void)
 
     MatrixClientShareMegolmOutSession(&client,
         USER_ID,
-        "ULZZOKJBYN",
+        DEVICE_ID2,
         megolmOutSession);
 
     MatrixClientSendEventEncrypted(&client,

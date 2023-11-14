@@ -2,15 +2,17 @@
 #include <matrix.h>
 #include <stdio.h>
 
-#define SERVER      "https://matrix.org"
-#define USER_ID     "@pscho:matrix.org"
-#define USERNAME    "pscho"
-#define PASSWORD    "Wc23EbmB9G3faMq"
-#define DISPLAYNAME "SyncClient"
+#define SERVER        "https://matrix.org"
+#define USER_ID       "@example:matrix.org"
+#define ROOM_ID       "!example:matrix.org"
+#define USERNAME      ""
+#define PASSWORD      ""
+#define DEVICE_NAME   ""
 
-#define ROOM_ID      "!XKFUjAsGrSSrpDFIxB:matrix.org"
-#define EVENT_ID     "$_-y42DkC3OmJ_s40gYko7jMwrUQhoXfEut2pMV3E2J8"
-#define SESSION_ID   "tzdnJbDrm82D/RpgkZKpILTifQ5Rads+tVzp3ax8+Ls"
+// event id of an encrypted event
+// devices can only be verified after they used e2ee in some way
+// (at least in Element)
+#define EVENT_ID     "$example"
 
 int
 main(void)
@@ -25,7 +27,7 @@ main(void)
     MatrixClientLoginPassword(&client,
         USERNAME,
         PASSWORD,
-        DISPLAYNAME);
+        DEVICE_NAME);
     
     MatrixClientGenerateOnetimeKeys(&client, 10);
     MatrixClientUploadOnetimeKeys(&client);

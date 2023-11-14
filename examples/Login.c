@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <matrix.h>
 
-#define SERVER      "https://matrix.org"
-#define USERNAME    "pscho"
-#define PASSWORD    "Wc23EbmB9G3faMq"
-#define DISPLAYNAME "MatrixClient"
+#define SERVER        "https://matrix.org"
+#define USER_ID       "@example:matrix.org"
+#define USERNAME      ""
+#define PASSWORD      ""
+#define DEVICE_NAME   ""
 
 
 int
@@ -18,7 +19,7 @@ main(void)
     MatrixClientLoginPassword(&client,
         USERNAME,
         PASSWORD,
-        DISPLAYNAME);
+        DEVICE_NAME);
 
     printf("Access Token: %s\n", client.accessToken);
     printf("Device ID: %s\n", client.deviceId);

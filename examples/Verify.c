@@ -4,14 +4,20 @@
 
 #include <stdio.h>
 
-#define SERVER       "https://matrix.org"
-#define USER_ID      "@pscho:matrix.org"
+#define SERVER        "https://matrix.org"
+#define USER_ID       "@example:matrix.org"
+#define ROOM_ID       "!example:matrix.org"
+#define USERNAME      ""
+#define PASSWORD      ""
+#define DEVICE_NAME   ""
 
-#define DEVICE_ID    "ULZZOKJBYN"
-#define SENDER_KEY   "cjP41XzRlY+pd8DoiBuKQJj9o15mrx6gkrpqTkAPZ2c"
-#define ROOM_ID      "!XKFUjAsGrSSrpDFIxB:matrix.org"
-#define EVENT_ID     "$vOS09eUaI0CduqAcaIU5ZVk6ljLQfLspz7UThP8vaUM"
-#define SESSION_ID   "90UbGLue3ADVhvW7hFjoA2c6yg0JJKs/lPdMDZXnZAk"
+// event id of an encrypted event
+// devices can only be verified after they used e2ee in some way
+// (at least in Element)
+#define EVENT_ID     "$example"
+// device id of another device to share the megolm session with
+// I used the device id of a logged in Element web session
+#define DEVICE_ID2   ""
 
 #define STATIC static
 
@@ -25,9 +31,9 @@ main(void)
     MatrixClientSetUserId(client, USER_ID);
 
     MatrixClientLoginPassword(client,
-        "pscho",
-        "Wc23EbmB9G3faMq",
-        "Test1");
+        USERNAME,
+        PASSWORD,
+        DEVICE_NAME);
     printf("deviceId: %s\n", client->deviceId);
     MatrixClientGenerateOnetimeKeys(client, 10);
     MatrixClientUploadOnetimeKeys(client);
@@ -60,7 +66,7 @@ main(void)
     printf("megolm session id: %.10s... key: %.10s...\n", megolmOutSession->id, megolmOutSession->key);
     MatrixClientShareMegolmOutSession(client,
         USER_ID,
-        "ULZZOKJBYN",
+        DEVICE_ID2,
         megolmOutSession);
 
     // send 10 random messages

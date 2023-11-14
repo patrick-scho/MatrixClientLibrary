@@ -4,9 +4,11 @@
 #include <mjson.h>
 #include <matrix.h>
 
-#define SERVER       "https://matrix.org"
-#define USER_ID      "@pscho:matrix.org"
-#define ROOM_ID      "!XKFUjAsGrSSrpDFIxB:matrix.org"
+#define SERVER        "https://matrix.org"
+#define USER_ID       "@example:matrix.org"
+#define USERNAME      ""
+#define PASSWORD      ""
+#define DEVICE_NAME   ""
 
 #define BUFFER_SIZE 1024
 #define NUMBER_ARGS 10
@@ -130,8 +132,9 @@ ExecuteCommand(
     }
     else if (CheckCommand(cmd, "todevice")) {
         static char buffer[30000];
+        static char nextBatch[128];
         MatrixClientSync(client,
-            buffer, 30000, "");
+            buffer, 30000, nextBatch, 128);
         const char * todevice;
         int todeviceLen;
         mjson_find(buffer, 30000,
@@ -150,16 +153,6 @@ ExecuteCommand(
             args[0],
             args[1],
             args[2]);
-    }
-    else if (CheckCommand(cmd, "save")) {
-        CHECK_ARGS(1, "<filename>")
-
-        MatrixClientSave(client, args[0]);
-    }
-    else if (CheckCommand(cmd, "load")) {
-        CHECK_ARGS(1, "<filename>")
-
-        MatrixClientLoad(client, args[0]);
     }
     else if (CheckCommand(cmd, "send")) {
         CHECK_ARGS(2, "<room_id> <message>")
@@ -218,26 +211,6 @@ ExecuteCommand(
             args[2],
             &client->megolmOutSessions[sessionIndex]);
     }
-    else if (CheckCommand(cmd, "savesession")) {
-        CHECK_ARGS(3, "<session_index> <filename> <key>")
-
-        int sessionIndex = atoi(args[0]);
-
-        MatrixMegolmOutSessionSave(
-            &client->megolmOutSessions[sessionIndex],
-            args[1],
-            args[2]);
-    }
-    else if (CheckCommand(cmd, "loadsession")) {
-        CHECK_ARGS(3, "<session_index> <filename> <key>")
-
-        int sessionIndex = atoi(args[0]);
-
-        MatrixMegolmOutSessionLoad(
-            &client->megolmOutSessions[sessionIndex],
-            args[1],
-            args[2]);
-    }
     else if (CheckCommand(cmd, "printsessions")) {
         for (int i = 0; i < client->numMegolmOutSessions; i++) {
             printf("%d: %s\t%s\t%s\n", i,
@@ -277,7 +250,7 @@ main(void)
 
 
     MatrixClientSetUserId(&client, USER_ID);
-    MatrixClientLoginPassword(&client, "@pscho:matrix.org", "Wc23EbmB9G3faMq", "abc");
+    MatrixClientLoginPassword(&client, USERNAME, PASSWORD, DEVICE_NAME);
     MatrixClientGenerateOnetimeKeys(&client, 10);
     MatrixClientUploadDeviceKeys(&client);
     MatrixClientUploadOnetimeKeys(&client);
