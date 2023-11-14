@@ -1,2 +1,2 @@
-idf_component_register(SRCS "wifi.c" "Verify.c"
+idf_component_register(SRCS "wifi.c" "SendEncrypted.c"
                     INCLUDE_DIRS "")
