@@ -149,6 +149,7 @@ MatrixOlmSessionUnpickle(
     void * pickled, int pickledLen,
     const void * key, int keyLen);
 
+// create an olm sesseion from a type 0 message
 bool
 MatrixOlmSessionFrom(
     MatrixOlmSession * session,
@@ -157,6 +158,7 @@ MatrixOlmSessionFrom(
     const char * deviceKey,
     const char * encrypted);
 
+// create a new olm session from a claimed onetime key
 bool
 MatrixOlmSessionTo(
     MatrixOlmSession * session,
@@ -239,9 +241,6 @@ typedef struct MatrixClient {
     
     MatrixDevice devices[NUM_DEVICES];
     int numDevices;
-    
-    // char deviceKey[DEVICE_KEY_SIZE];
-    // char signingKey[DEVICE_KEY_SIZE];
 
     char userId[USER_ID_SIZE];
     char accessToken[ACCESS_TOKEN_SIZE];
@@ -315,17 +314,6 @@ MatrixClientSendEventEncrypted(
     const char * msgType,
     const char * msgBody);
 
-void
-HandleEvent(
-    MatrixClient * client,
-    const char * event, int eventLen);
-
-void
-HandleRoomEvent(
-    MatrixClient * client,
-    const char * room, int roomLen,
-    const char * event, int eventLen);
-
 bool
 MatrixClientSync(
     MatrixClient * client,
@@ -346,25 +334,21 @@ MatrixClientShareMegolmOutSession(
     const char * deviceId,
     MatrixMegolmOutSession * session);
 
-bool
-MatrixClientShareMegolmOutSessionTest(
-    MatrixClient * client,
-    const char * userId,
-    const char * deviceId,
-    MatrixMegolmOutSession * session);
-
+// try to lookup outgoing megolm session, return true if found
 bool
 MatrixClientGetMegolmOutSession(
     MatrixClient * client,
     const char * roomId,
     MatrixMegolmOutSession ** outSession);
 
+// create a new outgoing megolm session and store it locally
 bool
 MatrixClientNewMegolmOutSession(
     MatrixClient * client,
     const char * roomId,
     MatrixMegolmOutSession ** outSession);
 
+// try to lookup incoming megolm session, return true if found
 bool
 MatrixClientGetMegolmInSession(
     MatrixClient * client,
@@ -372,6 +356,7 @@ MatrixClientGetMegolmInSession(
     const char * sessionId, int sessionIdLen,
     MatrixMegolmInSession ** outSession);
 
+// create a new incoming megolm session and store it locally
 bool
 MatrixClientNewMegolmInSession(
     MatrixClient * client,
@@ -379,7 +364,8 @@ MatrixClientNewMegolmInSession(
     const char * sessionId,
     const char * sessionKey,
     MatrixMegolmInSession ** outSession);
-    
+
+// send a m.room_key_request to the device identified by userId/devideId
 bool
 MatrixClientRequestMegolmInSession(
     MatrixClient * client,
@@ -387,8 +373,9 @@ MatrixClientRequestMegolmInSession(
     const char * sessionId,
     const char * senderKey,
     const char * userId,
-    const char * deviceId); // TODO: remove deviceId (query all devices)
+    const char * deviceId);
 
+// try to lookup olm session, return true if found
 bool
 MatrixClientGetOlmSession(
     MatrixClient * client,
@@ -396,6 +383,7 @@ MatrixClientGetOlmSession(
     const char * deviceId,
     MatrixOlmSession ** outSession);
 
+// create a new olm session from a type 0 message and store it locally
 bool
 MatrixClientNewOlmSessionIn(
     MatrixClient * client,
@@ -403,7 +391,9 @@ MatrixClientNewOlmSessionIn(
     const char * deviceId,
     const char * encrypted,
     MatrixOlmSession ** outSession);
-    
+
+// create a new olm session with device userId/deviceId and store it locally
+// this automatically claims the onetime key
 bool
 MatrixClientNewOlmSessionOut(
     MatrixClient * client,
@@ -433,27 +423,33 @@ MatrixClientSendDummy(
     const char * userId,
     const char * deviceId);
 
+// lookup device key locally and if not present get it from server
 bool
 MatrixClientRequestDeviceKey(
     MatrixClient * client,
     const char * deviceId,
     char * outDeviceKey, int outDeviceKeyCap);
     
+// lookup signing key locally and if not present get it from server
 bool
 MatrixClientRequestSigningKey(
     MatrixClient * client,
     const char * deviceId,
     char * outSigningKey, int outSigningKeyCap);
 
+// lookup the master key for this user and if not present get it from server
 bool
 MatrixClientRequestMasterKey(
     MatrixClient * client,
     char * outMasterKey, int outMasterKeyCap);
 
+// call keys/query and store retrieved information
+// this is called by the other Request* functions
 bool
 MatrixClientRequestDeviceKeys(
     MatrixClient * client);
 
+// delete this device on the server
 bool
 MatrixClientDeleteDevice(
     MatrixClient * client);

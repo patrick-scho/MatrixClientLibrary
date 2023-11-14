@@ -9,8 +9,10 @@
 #include <esp_random.h>
 #endif
 
+// can be used to disable static allocation
 #define STATIC static
 
+// DEFINES
 #define LOGIN_REQUEST_SIZE 1024
 #define LOGIN_RESPONSE_SIZE 1024
 #define LOGIN_URL "/_matrix/client/v3/login"
@@ -52,6 +54,8 @@ STATIC char g_KeysUploadRequestSignedBuffer[KEYS_UPLOAD_REQUEST_SIGNED_SIZE];
 
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
+
+// Util
 
 void
 Randomize(
@@ -208,7 +212,6 @@ bool JsonSign(
 
     return true;
 }
-
 
 bool
 MatrixOlmAccountInit(
@@ -446,13 +449,8 @@ MatrixMegolmInSessionDecrypt(
             (uint8_t *)outDecrypted, outDecryptedCap,
             &megolmInMessageIndex);
     
-    printf("message index: %d\n", (int)megolmInMessageIndex);
-    
     if (res == olm_error()) {
         printf("error decrypting megolm message: %s\n", olm_inbound_group_session_last_error(session->session));
-    }
-    else {
-        printf("decrypted len: %d\n", res);
     }
     
     return true;
@@ -568,7 +566,7 @@ MatrixClientGenerateOnetimeKeys(
     return res != olm_error();
 }
 
-// https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3keysupload
+// https://spec.matrix.org/v1.8/client-server-api/#post_matrixclientv3keysupload
 bool
 MatrixClientUploadOnetimeKeys(
     MatrixClient * client)
@@ -580,10 +578,14 @@ MatrixClientUploadOnetimeKeys(
     olm_account_one_time_keys(client->olmAccount.account,
         onetimeKeysBuffer, 1024);
 
+    // olm_account_one_time_keys returns a json object
+    // find curve25519 member
     const char *keys;
     int keysLen;
     mjson_find(onetimeKeysBuffer, strlen(onetimeKeysBuffer), "$.curve25519", &keys, &keysLen);
 
+    // iterate over onetime keys, create key object
+    // sign it and append to request
     int koff, klen, voff, vlen, vtype, off = 0;
     while ((off = mjson_next(keys, keysLen, off, &koff, &klen, &voff, &vlen, &vtype)) != 0) {
         STATIC char keyJson[JSON_ONETIME_KEY_SIZE];
@@ -605,20 +607,13 @@ MatrixClientUploadOnetimeKeys(
             keyJsonSigned);
     }
 
+    // delete last ',' since the loop always appends it
     if (g_KeysUploadRequestBuffer[strlen(g_KeysUploadRequestBuffer)-1] == ',')
         g_KeysUploadRequestBuffer[strlen(g_KeysUploadRequestBuffer)-1] = '\0';
 
     mjson_snprintf(g_KeysUploadRequestBuffer+strlen(g_KeysUploadRequestBuffer), KEYS_UPLOAD_REQUEST_SIZE-strlen(g_KeysUploadRequestBuffer),
         "}");
-        
-    // STATIC char onetimeKeysSignedBuffer[KEYS_UPLOAD_REQUEST_SIGNED_SIZE];
-    // JsonSign(client,
-    //     g_KeysUploadRequestBuffer, strlen(g_KeysUploadRequestBuffer),
-    //     onetimeKeysSignedBuffer, KEYS_UPLOAD_REQUEST_SIZE);
-        
-    // STATIC char finalEvent[KEYS_UPLOAD_REQUEST_SIGNED_SIZE];
-    // snprintf(finalEvent, KEYS_UPLOAD_REQUEST_SIGNED_SIZE,
-    // "{\"one_time_keys\":%s}", onetimeKeysSignedBuffer);
+
     snprintf(g_KeysUploadRequestSignedBuffer, KEYS_UPLOAD_REQUEST_SIGNED_SIZE,
     "{\"one_time_keys\":%s}", g_KeysUploadRequestBuffer);
 
@@ -632,7 +627,7 @@ MatrixClientUploadOnetimeKeys(
     return true;
 }
 
-// https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3keysupload
+// https://spec.matrix.org/v1.8/client-server-api/#post_matrixclientv3keysupload
 bool
 MatrixClientUploadDeviceKeys(
     MatrixClient * client)
@@ -676,7 +671,7 @@ MatrixClientUploadDeviceKeys(
     return true;
 }
 
-// https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3keysclaim
+// https://spec.matrix.org/v1.8/client-server-api/#post_matrixclientv3keysclaim
 bool
 MatrixClientClaimOnetimeKey(
     MatrixClient * client,
@@ -708,18 +703,24 @@ MatrixClientClaimOnetimeKey(
     JsonEscape(userId, strlen(userId),
         userIdEscaped, USER_ID_SIZE);
     
+    // create the json query according to
+    // https://spec.matrix.org/v1.8/client-server-api/#post_matrixclientv3keysclaim
     STATIC char query[JSON_QUERY_SIZE];
     snprintf(query, JSON_QUERY_SIZE,
         "$.one_time_keys.%s.%s",
         userIdEscaped,
         deviceId);
     
+    // find the corresponding json object
     const char * keyObject;
     int keyObjectSize;
     mjson_find(responseBuffer, strlen(responseBuffer),
         query,
         &keyObject, &keyObjectSize);
     
+    // use mjson_next (which iterates over all key/value pairs) once
+    // because we only request one key
+    // (see https://github.com/cesanta/mjson#mjson_next for details)
     int koff, klen, voff, vlen, vtype;
     mjson_next(keyObject, keyObjectSize, 0,
         &koff, &klen, &voff, &vlen, &vtype);
@@ -727,12 +728,12 @@ MatrixClientClaimOnetimeKey(
     mjson_get_string(keyObject + voff, vlen,
         "$.key", outOnetimeKey, outOnetimeKeyCap);
     
-    // TODO:verify signature
+    // TODO: verify signature
     
     return true;
 }
 
-// https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3login
+// https://spec.matrix.org/v1.8/client-server-api/#post_matrixclientv3login
 bool
 MatrixClientLoginPassword(
     MatrixClient * client,
@@ -769,6 +770,7 @@ MatrixClientLoginPassword(
     
     int responseLen = strlen(responseBuffer);
 
+    // store variables in MatrixClient
     mjson_get_string(responseBuffer, responseLen,
         "$.access_token",
         client->accessToken, ACCESS_TOKEN_SIZE);
@@ -787,7 +789,7 @@ MatrixClientLoginPassword(
     return true;
 }
 
-// https://spec.matrix.org/v1.6/client-server-api/#put_matrixclientv3roomsroomidsendeventtypetxnid
+// https://spec.matrix.org/v1.8/client-server-api/#put_matrixclientv3roomsroomidsendeventtypetxnid
 bool
 MatrixClientSendEvent(
     MatrixClient * client,
@@ -796,7 +798,7 @@ MatrixClientSendEvent(
     const char * msgBody)
 {    
     STATIC char requestUrl[MAX_URL_LEN];
-    sprintf(requestUrl,
+    snprintf(requestUrl, MAX_URL_LEN,
         ROOM_SEND_URL, roomId, msgType, (int)time(NULL));
 
     STATIC char responseBuffer[ROOM_SEND_RESPONSE_SIZE];
@@ -810,7 +812,7 @@ MatrixClientSendEvent(
     return result;
 }
 
-// https://spec.matrix.org/v1.6/client-server-api/#mroomencrypted
+// https://spec.matrix.org/v1.8/client-server-api/#mroomencrypted
 // https://matrix.org/docs/guides/end-to-end-encryption-implementation-guide#sending-an-encrypted-message-event
 bool
 MatrixClientSendEventEncrypted(
@@ -821,7 +823,7 @@ MatrixClientSendEventEncrypted(
 {
     // event json
     STATIC char requestBuffer[ROOM_SEND_REQUEST_SIZE];
-    sprintf(requestBuffer,
+    snprintf(requestBuffer, ROOM_SEND_REQUEST_SIZE,
         "{"
         "\"type\":\"%s\","
         "\"content\":%s,"
@@ -870,21 +872,30 @@ MatrixClientSendEventEncrypted(
         g_EncryptedEventBuffer);
 }
 
+// this handles to_device events received from a sync
+// mainly for verification (m.key.verification.* events)
 void
 MatrixClientHandleEvent(
     MatrixClient * client,
     const char * event, int eventLen
 ) {
+    // get the event type
     STATIC char eventType[128];
     memset(eventType, 0, sizeof(eventType));
     mjson_get_string(event, eventLen, "$.type", eventType, 128);
 
+    // static variables for verification
+    // since verification takes multiple requests
+    // data is cleared when verification is finished or started
     static char transactionId[64];
     static char verifyFromDeviceId[DEVICE_ID_SIZE];
     static OlmSAS * olmSas = NULL;
 
+    // initial verification request, reply that we are ready to verify
     if (strcmp(eventType, "m.key.verification.request") == 0) {
+        // reset static data
         memset(transactionId, 0, 64);
+        memset(verifyFromDeviceId, 0, DEVICE_ID_SIZE);
         if (olmSas != NULL)
             free(olmSas);
         
@@ -916,6 +927,8 @@ MatrixClientHandleEvent(
         
         OlmUtility * olmUtil = olm_utility(malloc(olm_utility_size()));
         
+        // calculate commitment according to 
+        // https://spec.matrix.org/v1.8/client-server-api/#mkeyverificationaccept
         STATIC char publicKey[64];
         STATIC char keyStartJsonCanonical[512];
         STATIC char concat[512+64];
@@ -923,20 +936,19 @@ MatrixClientHandleEvent(
         olm_sas_get_pubkey(olmSas,
             publicKey,
             64);
-        printf("public key: %.*s\n", olm_sas_pubkey_length(olmSas), publicKey);
 
         const char * keyStartJson;
         int keyStartJsonLen;
         mjson_find(event, eventLen, "$.content", &keyStartJson, &keyStartJsonLen);
         JsonCanonicalize(keyStartJson, keyStartJsonLen, keyStartJsonCanonical, 512);
 
-        printf("json:\n%.*s\ncanonical json:\n%s\n", keyStartJsonLen, keyStartJson, keyStartJsonCanonical);
-
         int concatLen =
-            snprintf(concat, 512+64, "%.*s%s", olm_sas_pubkey_length(olmSas), publicKey, keyStartJsonCanonical);
+            snprintf(concat, 512+64, "%.*s%s", (int)olm_sas_pubkey_length(olmSas), publicKey, keyStartJsonCanonical);
 
         int commitmentLen =
             olm_sha256(olmUtil, concat, concatLen, commitment, 1024);
+        olm_clear_utility(olmUtil);
+        free(olmUtil);
         
         STATIC char verificationAcceptBuffer[512];
         snprintf(verificationAcceptBuffer, 512,
@@ -958,6 +970,7 @@ MatrixClientHandleEvent(
             verificationAcceptBuffer,
             "m.key.verification.accept");
     }
+    // send our sas key and calculate sas using their received key
     else if (strcmp(eventType, "m.key.verification.key") == 0) {
         STATIC char publicKey[128];
         olm_sas_get_pubkey(olmSas,
@@ -967,10 +980,6 @@ MatrixClientHandleEvent(
         STATIC char theirPublicKey[128];
         int theirPublicKeyLen =
             mjson_get_string(event, eventLen, "$.content.key", theirPublicKey, 128);
-        
-        printf("event: %.*s\n", eventLen, event);
-        printf("theirPublicKey: %.*s\n", theirPublicKeyLen, theirPublicKey);
-        printf("publicKey: %.*s\n", olm_sas_pubkey_length(olmSas), publicKey);
 
         olm_sas_set_their_key(olmSas, theirPublicKey, theirPublicKeyLen);
         
@@ -980,7 +989,7 @@ MatrixClientHandleEvent(
             "\"key\":\"%.*s\","
             "\"transaction_id\":\"%s\""
             "}",
-            olm_sas_pubkey_length(olmSas), publicKey,
+            (int)olm_sas_pubkey_length(olmSas), publicKey,
             transactionId);
         
         MatrixClientSendToDevice(client,
@@ -1009,19 +1018,15 @@ MatrixClientHandleEvent(
         int b2 = sasBytes[2];
         int b3 = sasBytes[3];
         int b4 = sasBytes[4];
-        
-        printf("%d %d %d %d %d\n", b0, b1, b2, b3, b4);
 
-        // https://spec.matrix.org/v1.7/client-server-api/#sas-method-decimal
-        printf("%d | %d | %d\n",
-            (b0 << 5 | b1 >> 3) + 1000,
-            ((b1 & 0x7) << 10 | b2 << 2 | b3 >> 6) + 1000,
-            ((b3 & 0x3F) << 7 | b4 >> 1) + 1000);
+        // for now just printf SAS numbers
+        // https://spec.matrix.org/v1.8/client-server-api/#sas-method-decimal
         printf("%d | %d | %d\n",
             ((b0 << 5) | (b1 >> 3)) + 1000,
             (((b1 & 0x7) << 10) | (b2 << 2) | (b3 >> 6)) + 1000,
             (((b3 & 0x3F) << 7) | (b4 >> 1)) + 1000);
     }
+    // calculate MACs for signing key, master key and the key list
     else if (strcmp(eventType, "m.key.verification.mac") == 0) {        
         // mac
         STATIC char masterKey[123];
@@ -1036,6 +1041,8 @@ MatrixClientHandleEvent(
         STATIC char key2[128];
         STATIC char key2Mac[128];
 
+        // keys have to be sorted so write keys/key IDs into key1/key2
+        // depending on lexicographical order
         if (strcmp(masterKey, client->deviceId) < 0) {
             snprintf(key1Id, 1024, "ed25519:%s", masterKey);
             strcpy(key1, masterKey);
@@ -1049,9 +1056,12 @@ MatrixClientHandleEvent(
             strcpy(key2, masterKey);
         }
 
+        // create key list
         snprintf(keyList, 1024,
             "%s,%s", key1Id, key2Id);
         
+        // generate MAC info for both keys and key list
+        // https://spec.matrix.org/v1.8/client-server-api/#mac-calculation
         STATIC char macInfo[1024];
         int macInfoLen;
         {
@@ -1091,6 +1101,7 @@ MatrixClientHandleEvent(
             olm_sas_calculate_mac_fixed_base64(olmSas, key2, strlen(key2), macInfo, macInfoLen, key2Mac, 1024);
         }
 
+        // construct message and send
         STATIC char verificationMacBuffer[1024];
         snprintf(verificationMacBuffer, 1024,
             "{"
@@ -1114,6 +1125,7 @@ MatrixClientHandleEvent(
             verificationMacBuffer,
             "m.key.verification.mac");
 
+        // send 'done' message
         STATIC char verificationDoneBuffer[128];
         snprintf(verificationDoneBuffer, 128,
             "{"
@@ -1128,12 +1140,14 @@ MatrixClientHandleEvent(
             "m.key.verification.done");
         
         free(olmSas);
+
         client->verified = true;
     }
     else if (strcmp(eventType, "m.room.encrypted") == 0) {
         STATIC char algorithm[128];
         mjson_get_string(event, eventLen, "$.content.algorithm", algorithm, 128);
 
+        // since this only handles to_device messages algorithm should always be olm
         if (strcmp(algorithm, "m.olm.v1.curve25519-aes-sha2") == 0) {
             STATIC char thisDeviceKey[DEVICE_KEY_SIZE];
             MatrixOlmAccountGetDeviceKey(&client->olmAccount, thisDeviceKey, DEVICE_KEY_SIZE);
@@ -1151,16 +1165,19 @@ MatrixClientHandleEvent(
 
             MatrixOlmSession * olmSession;
             
-            if (! MatrixClientGetOlmSession(client, client->userId, verifyFromDeviceId, &olmSession))
-            {
-                if (messageTypeInt == 0) {
-                    MatrixClientNewOlmSessionIn(client,
-                        client->userId,
-                        verifyFromDeviceId,
-                        g_EncryptedEventBuffer,
-                        &olmSession);
-                }
-                else {
+            // depending on message type create new incoming
+            // (type 0 indicates a new session so we dont check locally)
+            if (messageTypeInt == 0) {
+                MatrixClientNewOlmSessionIn(client,
+                    client->userId,
+                    verifyFromDeviceId,
+                    g_EncryptedEventBuffer,
+                    &olmSession);
+            }
+            // or new outgoing, checking for known sessions first
+            else {
+                if (! MatrixClientGetOlmSession(client, client->userId, verifyFromDeviceId, &olmSession))
+                {
                     MatrixClientNewOlmSessionOut(client,
                         client->userId,
                         verifyFromDeviceId,
@@ -1177,15 +1194,13 @@ MatrixClientHandleEvent(
     }
     else if (strcmp(eventType, "m.room_key") == 0 ||
              strcmp(eventType, "m.forwarded_room_key") == 0) {
+        // store session information
         STATIC char roomId[128];
         STATIC char sessionId[128];
         STATIC char sessionKey[1024];
         mjson_get_string(event, eventLen, "$.content.room_id", roomId, 128);
         mjson_get_string(event, eventLen, "$.content.session_id", sessionId, 128);
         mjson_get_string(event, eventLen, "$.content.session_key", sessionKey, 1024);
-        
-        printf("sessionId: %s\n", sessionId);
-        printf("sessionKey: %s\n", sessionKey);
 
         MatrixMegolmInSession * megolmInSession;
         MatrixClientNewMegolmInSession(client, roomId, sessionId, sessionKey, &megolmInSession);
@@ -1206,6 +1221,8 @@ MatrixClientHandleRoomEvent(
         STATIC char algorithm[128];
         mjson_get_string(event, eventLen, "$.content.algorithm", algorithm, 128);
 
+        // only room specific message type is encrypted
+        // since this is only room messages, algorithm should always be megolm
         if (strcmp(algorithm, "m.megolm.v1.aes-sha2") == 0) {
             STATIC char sessionId[128];
             int sessionIdLen =
@@ -1228,13 +1245,14 @@ MatrixClientHandleRoomEvent(
                 MatrixClientHandleEvent(client, decrypted, strlen(decrypted));
             }
             else {
-                printf("megolm session not known\n");
+                printf("error: megolm session not known\n");
             }
         }
     }
     MatrixClientHandleEvent(client, event, eventLen);
 }
 
+// pass the response from sync to Handle(Room)Event
 void
 MatrixClientHandleSync(
     MatrixClient * client,
@@ -1246,15 +1264,16 @@ MatrixClientHandleSync(
     const char * s = syncBuffer;
     int slen = syncBufferLen;
 
+    // read next_batch
     mjson_get_string(s, slen, "$.next_batch", nextBatch, nextBatchCap);
 
     // to_device
-
     const char * events;
     int eventsLen;
     res =
         mjson_find(s, slen, "$.to_device.events", &events, &eventsLen);
     
+    // iterate event and pass to HandleEvent
     if (res != MJSON_TOK_INVALID) {
         {
         int koff, klen, voff, vlen, vtype, off = 0;
@@ -1268,14 +1287,13 @@ MatrixClientHandleSync(
     }
 
     // rooms
-    
     const char * rooms;
     int roomsLen;
     res =
         mjson_find(s, slen, "$.rooms.join", &rooms, &roomsLen);
     
     if (res != MJSON_TOK_INVALID) {
-        {
+        // iterate rooms
         int koff, klen, voff, vlen, vtype, off = 0;
         for (off = 0; (off = mjson_next(rooms, roomsLen, off, &koff, &klen,
                                         &voff, &vlen, &vtype)) != 0; ) {
@@ -1288,7 +1306,7 @@ MatrixClientHandleSync(
                 mjson_find(v, vlen, "$.timeline.events", &events, &eventsLen);
             
             if (res != MJSON_TOK_INVALID) {
-                {
+                // iterate messages in that room
                 int koff2, klen2, voff2, vlen2, vtype2, off2 = 0;
                 for (off2 = 0; (off2 = mjson_next(events, eventsLen, off2, &koff2, &klen2,
                                                 &voff2, &vlen2, &vtype2)) != 0; ) {
@@ -1298,14 +1316,12 @@ MatrixClientHandleSync(
                         k+1, klen-2,
                         v2, vlen2);
                 }
-                }
             }
-        }
         }
     }
 }
 
-// https://spec.matrix.org/v1.6/client-server-api/#get_matrixclientv3sync
+// https://spec.matrix.org/v1.8/client-server-api/#get_matrixclientv3sync
 bool
 MatrixClientSync(
     MatrixClient * client,
@@ -1323,6 +1339,7 @@ MatrixClientSync(
     
     int index = strlen(url);
 
+    // URL encode next_batch parameter since it can include ~
     for (size_t i = 0; i < strlen(nextBatch); i++) {
         char c = nextBatch[i];
 
@@ -1350,7 +1367,7 @@ MatrixClientSync(
     return result;
 }
 
-// https://spec.matrix.org/v1.7/client-server-api/#get_matrixclientv3roomsroomideventeventid
+// https://spec.matrix.org/v1.8/client-server-api/#get_matrixclientv3roomsroomideventeventid
 bool
 MatrixClientGetRoomEvent(
     MatrixClient * client,
@@ -1380,7 +1397,7 @@ MatrixClientShareMegolmOutSession(
 {
     // generate room key event
     STATIC char eventBuffer[KEY_SHARE_EVENT_LEN];
-    sprintf(eventBuffer,
+    snprintf(eventBuffer, KEY_SHARE_EVENT_LEN,
         "{"
             "\"algorithm\":\"m.megolm.v1.aes-sha2\","
             "\"room_id\":\"%s\","
@@ -1394,37 +1411,6 @@ MatrixClientShareMegolmOutSession(
 
     // send
     MatrixClientSendToDeviceEncrypted(client,
-        userId,
-        deviceId,
-        eventBuffer,
-        "m.room_key");
-
-    return true;
-}
-
-bool
-MatrixClientShareMegolmOutSessionTest(
-    MatrixClient * client,
-    const char * userId,
-    const char * deviceId,
-    MatrixMegolmOutSession * session)
-{
-    // generate room key event
-    char eventBuffer[KEY_SHARE_EVENT_LEN];
-    sprintf(eventBuffer,
-        "{"
-            "\"algorithm\":\"m.megolm.v1.aes-sha2\","
-            "\"room_id\":\"%s\","
-            "\"session_id\":\"%s\","
-            "\"session_key\":\"%s\""
-        "}",
-        session->roomId,
-        session->id,
-        session->key
-    );
-
-    // send
-    MatrixClientSendToDevice(client,
         userId,
         deviceId,
         eventBuffer,
@@ -1656,7 +1642,7 @@ MatrixClientNewOlmSessionOut(
     return false;
 }
 
-// https://spec.matrix.org/v1.6/client-server-api/#put_matrixclientv3sendtodeviceeventtypetxnid
+// https://spec.matrix.org/v1.8/client-server-api/#put_matrixclientv3sendtodeviceeventtypetxnid
 bool
 MatrixClientSendToDevice(
     MatrixClient * client,
@@ -1666,7 +1652,7 @@ MatrixClientSendToDevice(
     const char * msgType)
 {
     STATIC char requestUrl[MAX_URL_LEN];
-    sprintf(requestUrl,
+    snprintf(requestUrl, MAX_URL_LEN,
         TODEVICE_URL, msgType, (int)time(NULL));
 
     snprintf(g_TodeviceEventBuffer, TODEVICE_EVENT_SIZE,
@@ -1688,8 +1674,6 @@ MatrixClientSendToDevice(
             g_TodeviceEventBuffer,
             responseBuffer, ROOM_SEND_RESPONSE_SIZE,
             true);
-    
-    printf("%s\n", responseBuffer);
     
     return result;
 }
@@ -1872,34 +1856,36 @@ MatrixClientRequestMasterKey(
     char * outMasterKey, int outMasterKeyCap)
 {
     if (strlen(client->masterKey) > 0) {
-        strncpy(outMasterKey, outMasterKeyCap, client->masterKey);
+        strncpy(outMasterKey, client->masterKey, outMasterKeyCap);
         return true;
     }
 
     MatrixClientRequestDeviceKeys(client);
     
     if (strlen(client->masterKey) > 0) {
-        strncpy(outMasterKey, outMasterKeyCap, client->masterKey);
+        strncpy(outMasterKey, client->masterKey, outMasterKeyCap);
         return true;
     }
 
     return false;
 }
 
-// https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3keysquery
+// https://spec.matrix.org/v1.8/client-server-api/#post_matrixclientv3keysquery
 bool
 MatrixClientRequestDeviceKeys(
     MatrixClient * client)
 {
     if (client->numDevices >= NUM_DEVICES) {
-        printf("Maximum number of devices reached\n");
+        printf("error: Maximum number of devices reached\n");
         return false;
     }
 
+    // escape userId so we can use it in json queries
     STATIC char userIdEscaped[USER_ID_SIZE];
     JsonEscape(client->userId, strlen(client->userId),
         userIdEscaped, USER_ID_SIZE);
 
+    // construct and send request
     STATIC char request[KEYS_QUERY_REQUEST_SIZE];
     snprintf(request, KEYS_QUERY_REQUEST_SIZE,
         "{\"device_keys\":{\"%s\":[]}}", client->userId);
@@ -1919,6 +1905,7 @@ MatrixClientRequestDeviceKeys(
     const char * s;
     int slen;
 
+    // look for master key
     snprintf(query, JSON_QUERY_SIZE,
         "$.master_keys.%s.keys", userIdEscaped);
     mjson_find(responseBuffer, strlen(responseBuffer),
@@ -1929,10 +1916,9 @@ MatrixClientRequestDeviceKeys(
                                     &voff, &vlen, &vtype)) != 0; ) {
         snprintf(client->masterKey, MASTER_KEY_SIZE,
             "%.*s", vlen-2, s+voff+1);
-
-        printf("found master key: %s\n", client->masterKey);
     }
 
+    // iterate over returned devices for that userId
     snprintf(query, JSON_QUERY_SIZE,
         "$.device_keys.%s", userIdEscaped);
     
@@ -1940,7 +1926,7 @@ MatrixClientRequestDeviceKeys(
         query, &s, &slen);
     
     // loop over keys
-    
+    // creating a new device if possible
     for (off = 0; (off = mjson_next(s, slen, off, &koff, &klen,
                                     &voff, &vlen, &vtype)) != 0; ) {
         const char * key = s + koff;
@@ -1974,7 +1960,6 @@ MatrixClientRequestDeviceKeys(
                     foundDevice = true;
 
             if (! foundDevice) {
-                printf("new device: %s %s %s\n", d.deviceId, d.deviceKey, d.signingKey);
                 client->devices[client->numDevices] = d;
                 client->numDevices++;
             }

@@ -202,8 +202,6 @@ MatrixHttpGet(
     else
         authorizationHeader[0] = '\0';
 
-    printf("GET %s%s\n", hc->host, url);
-
     hc->data = outResponseBuffer;
     hc->dataCap = outResponseCap;
     hc->dataLen = 0;
@@ -242,8 +240,6 @@ MatrixHttpPost(
             "Bearer %s", hc->accessToken);
     else
         authorizationHeader[0] = '\0';
-
-    printf("POST %s%s\n%s\n", hc->host, url, requestBuffer);
 
     hc->data = outResponseBuffer;
     hc->dataCap = outResponseCap;
@@ -285,8 +281,6 @@ MatrixHttpPut(
             "Bearer %s", hc->accessToken);
     else
         authorizationHeader[0] = '\0';
-
-    printf("PUT %s%s\n%s\n", hc->host, url, requestBuffer);
 
     hc->data = outResponseBuffer;
     hc->dataCap = outResponseCap;
