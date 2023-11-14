@@ -12,8 +12,8 @@ C_OPTS+=-l ws2_32
 C_OPTS+=-l ssl
 C_OPTS+=-l crypto
 C_OPTS+=-l stdc++
-#C_OPTS+=-fuse-ld=lld.exe -g -gcodeview -Wl,/debug,/pdb:out/test.pdb
-#C_OPTS+=-Wl,--verbose
+# uncomment to generate msvc debug symbols with clang (requires lld)
+# C_OPTS+=-fuse-ld=lld -g -gcodeview -Wl,/debug,/pdb:
 
 out/examples/%: examples/%.c src/*
 	$(CC) -o out/examples/$* examples/$*.c $(C_OPTS)
