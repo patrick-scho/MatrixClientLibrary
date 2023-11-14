@@ -27,6 +27,24 @@ To build the example for the ESP32 start an ESP-IDF shell in esp32/esp_project o
 - `idf.py flash`
 - `idf.py monitor`
 
+Examples for the ESP32 are in `esp32/esp_project/main`.
+There are currently two, SendEncrypted and Verify.
+The example can be set in `esp32/esp_project(_risc_v)/main/CMakeLists.txt` as the second argument after SRCS.
+
+Any code using the library should compile under ESP-IDF if the following code is added at the end of the file:
+```
+#include "wifi.h"
+
+void
+app_main(void)
+{
+    wifi_init(WIFI_SSID, WIFI_PASSWORD);
+
+    main();
+}
+
+```
+
 To use the library in an ESP-IDF project:
 - Add the matrix and olm components (can be found in `esp32/esp_project/components/`)
 - Add `wifi.c/.h` (can be found in `esp32/esp_project/main/`)
@@ -51,9 +69,9 @@ MatrixHttpInit(&client->hc, SERVER);
 MatrixClientSetUserId(client, USER_ID);
 
 MatrixClientLoginPassword(client,
-    "pscho",
-    "Wc23EbmB9G3faMq",
-    "Test1");
+    USERNAME,
+    PASSWORD,
+    DEVICE_NAME);
 
 MatrixClientDeleteDevice(client);
     
@@ -73,11 +91,10 @@ MatrixMegolmOutSession * megolmOutSession;
 MatrixClientNewMegolmOutSession(&client,
     ROOM_ID,
     &megolmOutSession);
-printf("megolm session id: %.10s... key: %.10s...\n", megolmOutSession->id, megolmOutSession->key);
 
 MatrixClientShareMegolmOutSession(&client,
     USER_ID,
-    "ULZZOKJBYN",
+    DEVICE_ID2,
     megolmOutSession);
 
 MatrixClientSendEventEncrypted(&client,
