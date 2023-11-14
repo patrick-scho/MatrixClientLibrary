@@ -42,6 +42,31 @@ To use the library in an ESP-IDF project:
 
 ## Examples
 
+### (De)Initialization
+```
+MatrixClient * client = (MatrixClient*)malloc(sizeof(MatrixClient));
+MatrixClientInit(client);
+
+MatrixHttpInit(&client->hc, SERVER);
+MatrixClientSetUserId(client, USER_ID);
+
+MatrixClientLoginPassword(client,
+    "pscho",
+    "Wc23EbmB9G3faMq",
+    "Test1");
+
+MatrixClientDeleteDevice(client);
+    
+MatrixHttpDeinit(&client->hc);
+```
+
+### Uploading keys
+```
+MatrixClientGenerateOnetimeKeys(client, 10);
+MatrixClientUploadOnetimeKeys(client);
+MatrixClientUploadDeviceKeys(client);
+```
+
 ### Sending an encrypted message
 ```
 MatrixMegolmOutSession * megolmOutSession;
