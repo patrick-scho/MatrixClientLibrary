@@ -32,7 +32,7 @@ There are currently two, SendEncrypted and Verify.
 The example can be set in `esp32/esp_project(_risc_v)/main/CMakeLists.txt` as the second argument after SRCS.
 
 Any code using the library should compile under ESP-IDF if the following code is added at the end of the file:
-```
+```c
 #include "wifi.h"
 
 void
@@ -61,7 +61,7 @@ To use the library in an ESP-IDF project:
 ## Examples
 
 ### (De)Initialization
-```
+```c
 MatrixClient * client = (MatrixClient*)malloc(sizeof(MatrixClient));
 MatrixClientInit(client);
 
@@ -79,14 +79,14 @@ MatrixHttpDeinit(&client->hc);
 ```
 
 ### Uploading keys
-```
+```c
 MatrixClientGenerateOnetimeKeys(client, 10);
 MatrixClientUploadOnetimeKeys(client);
 MatrixClientUploadDeviceKeys(client);
 ```
 
 ### Sending an encrypted message
-```
+```c
 MatrixMegolmOutSession * megolmOutSession;
 MatrixClientNewMegolmOutSession(&client,
     ROOM_ID,
@@ -104,7 +104,7 @@ MatrixClientSendEventEncrypted(&client,
 ```
 
 ### Verification
-```
+```c
 // Request an encrypted event to enable verification
 STATIC char eventBuffer[1024];
 MatrixClientGetRoomEvent(client,
