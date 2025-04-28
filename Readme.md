@@ -42,7 +42,6 @@ app_main(void)
 
     main();
 }
-
 ```
 
 To use the library in an ESP-IDF project:
